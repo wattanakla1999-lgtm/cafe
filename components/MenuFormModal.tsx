@@ -2,6 +2,7 @@ import React, { useState, useEffect } from "react";
 import { useMenu } from "../context/MenuContext";
 import { MenuItem, Category } from "../data/mock";
 import { Button } from "./Button";
+import { Combobox } from "./Combobox";
 
 interface MenuFormModalProps {
     isOpen: boolean;
@@ -11,7 +12,7 @@ interface MenuFormModalProps {
 }
 
 export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFormModalProps) {
-    const { menuItems, categories } = useMenu();
+    const { menuItems, categories, toppings } = useMenu();
 
     const [formData, setFormData] = useState<Omit<MenuItem, "id">>({
         name: "",
@@ -20,6 +21,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
         description: "",
         image: "",
         available: true,
+        allowedToppings: [],
     });
 
     useEffect(() => {
@@ -32,6 +34,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                     description: initialData.description || "",
                     image: initialData.image || "",
                     available: initialData.available !== undefined ? initialData.available : true,
+                    allowedToppings: initialData.allowedToppings || [],
                 });
             } else {
                 setFormData({
@@ -41,6 +44,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                     description: "",
                     image: "",
                     available: true,
+                    allowedToppings: [],
                 });
             }
         }
@@ -97,21 +101,14 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Category</label>
-                            <input
-                                list="categories-list"
-                                type="text"
-                                required
+                            <Combobox
+                                label="Category"
                                 value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
+                                onChange={(val) => setFormData({ ...formData, category: val })}
+                                options={categories}
                                 placeholder="Select or type new..."
+                                required
                             />
-                            <datalist id="categories-list">
-                                {categories.map((cat) => (
-                                    <option key={cat} value={cat} />
-                                ))}
-                            </datalist>
                         </div>
                     </div>
 
@@ -136,6 +133,31 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                             placeholder="https://images.unsplash.com/..."
                         />
                         <p className="text-xs text-[var(--color-coffee-400)] mt-1">Recommended aspect ratio: 4:3</p>
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-2">Allowed Toppings</label>
+                        <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-[var(--color-coffee-100)] rounded-lg bg-[var(--color-coffee-50)]">
+                            {toppings.map(t => (
+                                <label key={t.id} className="flex items-center space-x-2 bg-white p-2 rounded border border-[var(--color-coffee-100)] cursor-pointer hover:border-[var(--color-primary)]">
+                                    <input
+                                        type="checkbox"
+                                        checked={formData.allowedToppings?.includes(t.id)}
+                                        onChange={e => {
+                                            const current = formData.allowedToppings || [];
+                                            if (e.target.checked) {
+                                                setFormData({ ...formData, allowedToppings: [...current, t.id] });
+                                            } else {
+                                                setFormData({ ...formData, allowedToppings: current.filter(id => id !== t.id) });
+                                            }
+                                        }}
+                                        className="w-4 h-4 rounded text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
+                                    />
+                                    <span className="text-sm text-[var(--color-coffee-700)]">{t.name}</span>
+                                </label>
+                            ))}
+                            {toppings.length === 0 && <p className="text-xs text-gray-500 col-span-2 text-center py-2">No toppings available</p>}
+                        </div>
                     </div>
 
                     <div className="flex items-center gap-3 bg-[var(--color-coffee-50)] p-3 rounded-lg border border-[var(--color-coffee-100)]">

@@ -1,17 +1,33 @@
 "use client";
 
 import React, { createContext, useContext, useState, useEffect } from "react";
-import { MenuItem, MENU_ITEMS } from "../data/mock";
+import { MenuItem, MENU_ITEMS, Option, TOPPINGS } from "../data/mock";
+
+export interface Discount {
+    id: string;
+    name: string;
+    type: "percent" | "amount";
+    value: number;
+    active: boolean;
+}
 
 interface MenuContextType {
     menuItems: MenuItem[];
     categories: string[];
+    discounts: Discount[];
     addMenuItem: (item: Omit<MenuItem, "id">) => void;
     updateMenuItem: (id: string, updates: Partial<MenuItem>) => void;
     deleteMenuItem: (id: string) => void;
     updateCategory: (oldName: string, newName: string) => void;
     deleteCategory: (categoryName: string) => void;
     addCategory: (categoryName: string) => void;
+    addDiscount: (discount: Omit<Discount, "id">) => void;
+    updateDiscount: (id: string, discount: Partial<Discount>) => void;
+    deleteDiscount: (id: string) => void;
+    toppings: Option[];
+    addTopping: (topping: Option) => void;
+    updateTopping: (id: string, updates: Partial<Option>) => void;
+    deleteTopping: (id: string) => void;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
@@ -25,6 +41,41 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         // Mock data covers it.
         return Array.from(initialCats);
     });
+
+    const [discounts, setDiscounts] = useState<Discount[]>([
+        { id: "d1", name: "10% Off", type: "percent", value: 10, active: true },
+        { id: "d2", name: "5฿ Off", type: "amount", value: 5, active: true },
+        { id: "d3", name: "Staff Meal", type: "percent", value: 100, active: true },
+    ]);
+
+    const [toppings, setToppings] = useState<Option[]>(() => {
+        // Initialize from mock data if empty
+        return TOPPINGS;
+    });
+
+    const addDiscount = (discount: Omit<Discount, "id">) => {
+        setDiscounts(prev => [...prev, { ...discount, id: `d_${Date.now()}` }]);
+    };
+
+    const updateDiscount = (id: string, updates: Partial<Discount>) => {
+        setDiscounts(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+    };
+
+    const deleteDiscount = (id: string) => {
+        setDiscounts(prev => prev.filter(d => d.id !== id));
+    };
+
+    const addTopping = (topping: Option) => {
+        setToppings(prev => [...prev, topping]);
+    };
+
+    const updateTopping = (id: string, updates: Partial<Option>) => {
+        setToppings(prev => prev.map(t => t.id === id ? { ...t, ...updates } : t));
+    };
+
+    const deleteTopping = (id: string) => {
+        setToppings(prev => prev.filter(t => t.id !== id));
+    };
 
     const addMenuItem = (item: Omit<MenuItem, "id">) => {
         const newItem: MenuItem = {
@@ -87,7 +138,15 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             deleteMenuItem,
             updateCategory,
             deleteCategory,
-            addCategory
+            addCategory,
+            discounts,
+            addDiscount,
+            updateDiscount,
+            deleteDiscount,
+            toppings,
+            addTopping,
+            updateTopping,
+            deleteTopping
         }}>
             {children}
         </MenuContext.Provider>

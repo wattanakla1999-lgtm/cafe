@@ -9,7 +9,7 @@ import { useSearchParams, useRouter } from "next/navigation";
 function ReceiptSelectionContent() {
     const searchParams = useSearchParams();
     const name = searchParams.get("name") || "Guest";
-    const { submitOrder } = useOrder();
+    const { submitOrder, isSubmitting } = useOrder();
     const router = useRouter();
 
     const [selectedMethod, setSelectedMethod] = useState<string | null>(null);
@@ -22,7 +22,7 @@ function ReceiptSelectionContent() {
     ];
 
     const handleConfirm = () => {
-        if (!selectedMethod) return;
+        if (!selectedMethod || isSubmitting) return;
         submitOrder(name, "QR");
         router.push("/receipt");
     };
@@ -41,8 +41,8 @@ function ReceiptSelectionContent() {
                             key={m.id}
                             onClick={() => setSelectedMethod(m.id)}
                             className={`p-4 rounded-xl border-2 flex items-center space-x-4 transition-all ${selectedMethod === m.id
-                                    ? "border-[var(--color-primary)] bg-white shadow-md ring-2 ring-[var(--color-primary)] ring-opacity-10"
-                                    : "border-[var(--color-coffee-100)] bg-white hover:border-[var(--color-coffee-300)]"
+                                ? "border-[var(--color-primary)] bg-white shadow-md ring-2 ring-[var(--color-primary)] ring-opacity-10"
+                                : "border-[var(--color-coffee-100)] bg-white hover:border-[var(--color-coffee-300)]"
                                 }`}
                         >
                             <span className="text-3xl">{m.icon}</span>
@@ -60,9 +60,9 @@ function ReceiptSelectionContent() {
                     fullWidth
                     size="lg"
                     onClick={handleConfirm}
-                    disabled={!selectedMethod}
+                    disabled={!selectedMethod || isSubmitting}
                 >
-                    Confirm Order
+                    {isSubmitting ? "Processing..." : "Confirm Order"}
                 </Button>
             </div>
         </div>

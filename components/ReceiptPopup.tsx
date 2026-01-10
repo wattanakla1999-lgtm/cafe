@@ -3,6 +3,7 @@
 import React, { useState } from "react";
 import { Button } from "./Button";
 import Link from "next/link";
+import { useAuth } from "../context/AuthContext";
 
 interface ReceiptPopupProps {
     isOpen: boolean;
@@ -10,6 +11,7 @@ interface ReceiptPopupProps {
 }
 
 export function ReceiptPopup({ isOpen, onClose }: ReceiptPopupProps) {
+    const { user } = useAuth();
     const [showQR, setShowQR] = useState(false);
 
     if (!isOpen) return null;
@@ -43,7 +45,12 @@ export function ReceiptPopup({ isOpen, onClose }: ReceiptPopupProps) {
                     </div>
                 ) : (
                     <div className="space-y-6">
-                        <h3 className="text-xl font-bold text-[var(--color-coffee-900)]">Scan for Receipt</h3>
+                        <div className="flex flex-col items-center gap-2">
+                            {user?.storeImage && (
+                                <img src={user.storeImage} alt="Store Logo" className="w-16 h-16 rounded-full object-cover border border-[var(--color-coffee-200)]" />
+                            )}
+                            <h3 className="text-xl font-bold text-[var(--color-coffee-900)]">Scan for Receipt</h3>
+                        </div>
                         <div className="bg-[var(--color-coffee-100)] w-48 h-48 mx-auto rounded-xl flex items-center justify-center">
                             <span className="text-sm text-[var(--color-coffee-500)]">[QR Code]</span>
                         </div>

@@ -2,6 +2,7 @@
 
 import React, { createContext, useContext, useState, ReactNode, useEffect } from "react";
 import { MenuItem, Option } from "../data/mock";
+import { Discount } from "./MenuContext";
 
 export interface OrderItem {
     itemId: string;
@@ -16,6 +17,7 @@ export interface Order {
     customerName: string;
     items: OrderItem[];
     totalAmount: number;
+    discount?: { name: string, value: number, type: "percent" | "amount", amountOff: number };
     status: "pending" | "completed";
     timestamp: Date;
     channel: "QR" | "Counter";
@@ -31,6 +33,9 @@ interface OrderContextType {
     completeOrder: (orderId: string) => void;
     callOrder: (orderId: string) => void;
     currentCalling: string | null;
+    selectedDiscount: Discount | null;
+    setDiscount: (discount: Discount | null) => void;
+    isSubmitting: boolean;
 }
 
 const OrderContext = createContext<OrderContextType | undefined>(undefined);
@@ -39,6 +44,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
     const [cart, setCart] = useState<OrderItem[]>([]);
     const [orders, setOrders] = useState<Order[]>([]);
     const [currentCalling, setCurrentCalling] = useState<string | null>(null);
+    const [selectedDiscount, setSelectedDiscount] = useState<Discount | null>(null);
+    const [isSubmitting, setIsSubmitting] = useState(false);
 
     // Load from localStorage on mount
     useEffect(() => {
@@ -53,7 +60,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         if (savedCalling) {
             setCurrentCalling(savedCalling);
         }
+        const savedCart = localStorage.getItem("cafe_cart");
+        if (savedCart) {
+            setCart(JSON.parse(savedCart));
+        }
     }, []);
+
+    // Save Cart on change
+    useEffect(() => {
+        localStorage.setItem("cafe_cart", JSON.stringify(cart));
+    }, [cart]);
 
     // Sync with other tabs
     useEffect(() => {
@@ -92,23 +108,53 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     const submitOrder = (customerName: string, channel: "QR" | "Counter") => {
         if (cart.length === 0) return;
+        setIsSubmitting(true);
 
-        const totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+        // Simulate network delay to show loading state
+        setTimeout(() => {
+            let totalAmount = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+            let discountInfo = undefined;
 
-        const newOrder: Order = {
-            orderId: Math.random().toString(36).substring(2, 8).toUpperCase(),
-            customerName,
-            items: [...cart],
-            totalAmount,
-            status: "pending",
-            timestamp: new Date(),
-            channel,
-        };
+            if (selectedDiscount) {
+                let discountAmount = 0;
+                if (selectedDiscount.type === "percent") {
+                    discountAmount = totalAmount * (selectedDiscount.value / 100);
+                } else {
+                    discountAmount = selectedDiscount.value;
+                }
 
-        const updatedOrders = [newOrder, ...orders];
-        setOrders(updatedOrders);
-        localStorage.setItem("cafe_orders", JSON.stringify(updatedOrders));
-        clearCart();
+                // Ensure total doesn't go below 0
+                if (discountAmount > totalAmount) discountAmount = totalAmount;
+
+                discountInfo = {
+                    name: selectedDiscount.name,
+                    value: selectedDiscount.value,
+                    type: selectedDiscount.type,
+                    amountOff: discountAmount
+                };
+                totalAmount -= discountAmount;
+            }
+
+            const newOrder: Order = {
+                orderId: Math.random().toString(36).substring(2, 8).toUpperCase(),
+                customerName,
+                items: [...cart],
+                totalAmount,
+                discount: discountInfo,
+                status: "pending",
+                timestamp: new Date(),
+                channel,
+            };
+
+            // Clear discount after submit
+            setSelectedDiscount(null);
+
+            const updatedOrders = [newOrder, ...orders];
+            setOrders(updatedOrders);
+            localStorage.setItem("cafe_orders", JSON.stringify(updatedOrders));
+            clearCart();
+            setIsSubmitting(false);
+        }, 1000); // 1 second delay
     };
 
     const completeOrder = (orderId: string) => {
@@ -140,7 +186,10 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             orders,
             completeOrder,
             callOrder,
-            currentCalling
+            currentCalling,
+            selectedDiscount,
+            setDiscount: setSelectedDiscount,
+            isSubmitting
         }}>
             {children}
         </OrderContext.Provider>

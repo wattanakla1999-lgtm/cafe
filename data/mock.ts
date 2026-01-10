@@ -14,6 +14,7 @@ export interface MenuItem {
     description?: string;
     image?: string; // Placeholder for now
     available: boolean;
+    allowedToppings?: string[]; // IDs of allowed toppings
 }
 
 export const MENU_ITEMS: MenuItem[] = [
@@ -41,11 +42,7 @@ export const SWEETNESS_LEVELS: Option[] = [
     { id: "sw100", name: "100% (Normal)", price: 0 },
 ];
 
-export const MILK_OPTIONS: Option[] = [
-    { id: "m1", name: "Whole Milk", price: 0 },
-    { id: "m2", name: "Oat Milk", price: 15 },
-    { id: "m3", name: "Soy Milk", price: 10 },
-];
+
 
 export const TOPPINGS: Option[] = [
     { id: "t1", name: "Extra Shot", price: 15 },

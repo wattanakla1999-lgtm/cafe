@@ -1,7 +1,8 @@
 "use client";
 
 import React, { useState } from "react";
-import { MenuItem, MILK_OPTIONS, Option, SWEETNESS_LEVELS, TOPPINGS } from "../data/mock";
+import { useMenu } from "../context/MenuContext";
+import { MenuItem, Option, SWEETNESS_LEVELS } from "../data/mock";
 import { Button } from "./Button";
 
 interface OptionModalProps {
@@ -12,12 +13,20 @@ interface OptionModalProps {
 }
 
 export function OptionModal({ item, isOpen, onClose, onConfirm }: OptionModalProps) {
+    const { toppings } = useMenu();
     const [sweetness, setSweetness] = useState<Option>(SWEETNESS_LEVELS[3]); // Default 100%
-    const [milk, setMilk] = useState<Option>(MILK_OPTIONS[0]); // Default Whole Milk
     const [selectedToppings, setSelectedToppings] = useState<Option[]>([]);
     const [quantity, setQuantity] = useState(1);
 
     if (!isOpen || !item) return null;
+
+    // Filter toppings:
+    // If filteredToppings is provided in item, show only those.
+    // If empty/undefined, show ALL (legacy behavior) OR show NONE (strict).
+    // Let's assume: if array is present, use it. If undefined (legacy data), show ALL.
+    const filteredToppings = item.allowedToppings
+        ? toppings.filter(t => item.allowedToppings?.includes(t.id))
+        : toppings;
 
     const toggleTopping = (topping: Option) => {
         if (selectedToppings.find(t => t.id === topping.id)) {
@@ -29,19 +38,17 @@ export function OptionModal({ item, isOpen, onClose, onConfirm }: OptionModalPro
 
     const calculateTotal = () => {
         const base = item.price;
-        const milkPrice = milk.price;
         const toppingPrice = selectedToppings.reduce((sum, t) => sum + t.price, 0);
-        return (base + milkPrice + toppingPrice) * quantity;
+        return (base + toppingPrice) * quantity;
     };
 
     const handleConfirm = () => {
-        const allOptions = [sweetness, milk, ...selectedToppings];
+        const allOptions = [sweetness, ...selectedToppings];
         onConfirm(item, allOptions, quantity);
         // Reset state for next use (optional, but good practice)
         setQuantity(1);
         setSelectedToppings([]);
         setSweetness(SWEETNESS_LEVELS[3]);
-        setMilk(MILK_OPTIONS[0]);
     };
 
     return (
@@ -73,8 +80,8 @@ export function OptionModal({ item, isOpen, onClose, onConfirm }: OptionModalPro
                                     key={level.id}
                                     onClick={() => setSweetness(level)}
                                     className={`p-2 rounded-lg border text-sm transition-all ${sweetness.id === level.id
-                                            ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
-                                            : "border-[var(--color-coffee-200)] text-[var(--color-coffee-700)] bg-white"
+                                        ? "border-[var(--color-primary)] bg-[var(--color-primary)] text-white"
+                                        : "border-[var(--color-coffee-200)] text-[var(--color-coffee-700)] bg-white"
                                         }`}
                                 >
                                     {level.name}
@@ -83,35 +90,13 @@ export function OptionModal({ item, isOpen, onClose, onConfirm }: OptionModalPro
                         </div>
                     </div>
 
-                    {/* Milk Options */}
-                    {item.category === "Coffee" || item.category === "Non-Coffee" ? (
-                        <div>
-                            <h4 className="font-bold text-[var(--color-coffee-800)] mb-2">Milk Option</h4>
-                            <div className="space-y-2">
-                                {MILK_OPTIONS.map(m => (
-                                    <label key={m.id} className="flex items-center justify-between p-3 rounded-lg border border-[var(--color-coffee-100)] active:bg-[var(--color-coffee-50)] cursor-pointer">
-                                        <div className="flex items-center">
-                                            <input
-                                                type="radio"
-                                                name="milk"
-                                                checked={milk.id === m.id}
-                                                onChange={() => setMilk(m)}
-                                                className="w-4 h-4 text-[var(--color-primary)] focus:ring-[var(--color-primary)]"
-                                            />
-                                            <span className="ml-3 text-[var(--color-coffee-800)]">{m.name}</span>
-                                        </div>
-                                        {m.price > 0 && <span className="text-sm text-[var(--color-coffee-500)]">+฿{m.price}</span>}
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    ) : null}
+
 
                     {/* Toppings */}
                     <div>
                         <h4 className="font-bold text-[var(--color-coffee-800)] mb-2">Toppings</h4>
                         <div className="space-y-2">
-                            {TOPPINGS.map(t => (
+                            {filteredToppings.map(t => (
                                 <label key={t.id} className="flex items-center justify-between p-3 rounded-lg border border-[var(--color-coffee-100)] active:bg-[var(--color-coffee-50)] cursor-pointer">
                                     <div className="flex items-center">
                                         <input

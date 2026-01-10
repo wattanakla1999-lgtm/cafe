@@ -2,12 +2,14 @@
 
 import React, { useEffect, useState } from "react";
 import { useOrder } from "../../context/OrderContext";
+import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/Button";
 import Link from "next/link";
 import { Order } from "../../context/OrderContext";
 
 export default function ReceiptPage() {
     const { orders } = useOrder();
+    const { user } = useAuth();
     const [latestOrder, setLatestOrder] = useState<Order | null>(null);
 
     useEffect(() => {
@@ -36,8 +38,11 @@ export default function ReceiptPage() {
                 <div className="absolute top-0 left-0 right-0 h-2 bg-[var(--color-coffee-50)]" style={{ clipPath: "polygon(0% 0%, 5% 100%, 10% 0%, 15% 100%, 20% 0%, 25% 100%, 30% 0%, 35% 100%, 40% 0%, 45% 100%, 50% 0%, 55% 100%, 60% 0%, 65% 100%, 70% 0%, 75% 100%, 80% 0%, 85% 100%, 90% 0%, 95% 100%, 100% 0%)" }}></div>
 
                 <div className="p-8 pt-12 text-center space-y-6">
-                    <div className="space-y-1">
-                        <h2 className="text-2xl font-bold text-[var(--color-coffee-900)]">Cafe</h2>
+                    <div className="space-y-1 flex flex-col items-center">
+                        {user?.storeImage && (
+                            <img src={user.storeImage} alt="Store Logo" className="w-16 h-16 rounded-full object-cover border border-[var(--color-coffee-200)] mb-2" />
+                        )}
+                        <h2 className="text-2xl font-bold text-[var(--color-coffee-900)]">{user?.storeName || "Cafe"}</h2>
                         <p className="text-sm text-[var(--color-coffee-500)]">Order #{latestOrder.orderId}</p>
                         <p className="text-xs text-[var(--color-coffee-400)]">{latestOrder.timestamp.toLocaleString()}</p>
                     </div>

@@ -8,16 +8,12 @@ import { useRouter } from "next/navigation";
 
 export default function CartPage() {
     const { cart, removeFromCart } = useOrder();
-    const [name, setName] = useState("");
     const router = useRouter();
 
     const total = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
     const handleNext = () => {
-        if (!name.trim()) return;
-        // Pass name via query param to keep it simple, or we could use a global "DraftOrder" state.
-        // Using query param for simplicity in this prototype.
-        router.push(`/receipt-selection?name=${encodeURIComponent(name)}`);
+        router.push("/receipt-selection");
     };
 
     if (cart.length === 0) {
@@ -70,22 +66,6 @@ export default function CartPage() {
                         </div>
                     ))}
                 </div>
-
-                {/* Customer Name Input */}
-                <div className="bg-white p-4 rounded-xl shadow-sm border border-[var(--color-coffee-100)] space-y-3">
-                    <label htmlFor="name" className="block font-bold text-[var(--color-coffee-800)]">
-                        Your Name <span className="text-red-500">*</span>
-                    </label>
-                    <input
-                        id="name"
-                        type="text"
-                        value={name}
-                        onChange={(e) => setName(e.target.value)}
-                        placeholder="e.g. Kla"
-                        className="w-full p-3 bg-[var(--color-background)] border border-[var(--color-coffee-200)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none transition-all"
-                    />
-                    <p className="text-xs text-[var(--color-coffee-500)]">We will call this name when your order is ready.</p>
-                </div>
             </div>
 
             {/* Footer */}
@@ -98,7 +78,7 @@ export default function CartPage() {
                     fullWidth
                     size="lg"
                     onClick={handleNext}
-                    disabled={!name.trim() || cart.length === 0}
+                    disabled={cart.length === 0}
                 >
                     Next Step (Select Receipt)
                 </Button>

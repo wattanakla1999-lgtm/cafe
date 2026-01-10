@@ -2,13 +2,19 @@
 
 import { OrderProvider } from "../context/OrderContext";
 import { MenuProvider } from "../context/MenuContext";
+import { AuthProvider } from "../context/AuthContext";
+
+import { NetworkStatus } from "./NetworkStatus";
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
-        <MenuProvider>
-            <OrderProvider>
-                {children}
-            </OrderProvider>
-        </MenuProvider>
+        <AuthProvider>
+            <MenuProvider>
+                <OrderProvider>
+                    <NetworkStatus />
+                    {children}
+                </OrderProvider>
+            </MenuProvider>
+        </AuthProvider>
     );
 }
