@@ -11,7 +11,9 @@ import { useMenu } from "../../context/MenuContext";
 
 import { useSearchParams } from "next/navigation";
 
-export default function MenuPage() {
+import { Suspense } from "react";
+
+function MenuContent() {
     const { menuItems, categories: contextCategories, setPublicStoreId } = useMenu();
     const searchParams = useSearchParams();
     const storeId = searchParams.get("storeId");
@@ -111,5 +113,13 @@ export default function MenuPage() {
                 onConfirm={handleConfirm}
             />
         </div>
+    );
+}
+
+export default function MenuPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <MenuContent />
+        </Suspense>
     );
 }

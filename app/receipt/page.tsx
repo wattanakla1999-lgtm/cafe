@@ -7,7 +7,9 @@ import { Button } from "../../components/Button";
 import Link from "next/link";
 import { Order } from "../../context/OrderContext";
 
-export default function ReceiptPage() {
+import { Suspense } from "react";
+
+function ReceiptContent() {
     const searchParams = useSearchParams();
     const orderId = searchParams.get("id");
     const [order, setOrder] = useState<Order | null>(null);
@@ -25,10 +27,10 @@ export default function ReceiptPage() {
                 const { data, error } = await supabase
                     .from("orders")
                     .select(`
-                        *,
+                        id, customer_name, total_amount, discount_info, status, created_at, channel, store_id,
                         store:stores(name),
                         order_items (
-                            *,
+                            quantity, total_price, options, name,
                             menu_item:menu_items (
                                 id, name, price, image, description
                             )
@@ -50,14 +52,14 @@ export default function ReceiptPage() {
                         timestamp: new Date(data.created_at),
                         channel: data.channel,
                         items: data.order_items.map((oi: any) => ({
-                            itemId: oi.id,
+                            itemId: oi.id, // This might be undefined in join, but oi is order_items row here
                             quantity: oi.quantity,
                             totalPrice: oi.total_price,
                             options: oi.options || [],
                             menuItem: {
-                                id: oi.menu_item?.id || oi.menu_item_id,
-                                name: oi.name,
-                                price: oi.price,
+                                id: oi.menu_item?.id || "unknown", // Fallback
+                                name: oi.menu_item?.name || oi.name, // Use stored name if join fails
+                                price: oi.menu_item?.price || 0,
                                 image: oi.menu_item?.image,
                                 description: oi.menu_item?.description,
                                 category: "Unknown",
@@ -69,7 +71,8 @@ export default function ReceiptPage() {
                         // We might need to extend Order type or just use local variable for display
                     };
                     // Hack: attach store name to valid display
-                    (mappedOrder as any).storeName = data.store?.name;
+                    const storeData = data.store as any;
+                    (mappedOrder as any).storeName = Array.isArray(storeData) ? storeData[0]?.name : storeData?.name;
                     mappedOrder.store_id = data.store_id; // Pass store_id for navigation
                     setOrder(mappedOrder);
                 }
@@ -157,5 +160,13 @@ export default function ReceiptPage() {
                 </Link>
             </div>
         </div>
+    );
+}
+
+export default function ReceiptPage() {
+    return (
+        <Suspense fallback={<div className="min-h-screen flex items-center justify-center">Loading...</div>}>
+            <ReceiptContent />
+        </Suspense>
     );
 }
