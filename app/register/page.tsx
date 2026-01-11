@@ -48,6 +48,7 @@ export default function RegisterPage() {
                 router.push("/");
             } else {
                 setError(result.error || "Registration failed");
+                setIsLoading(false);
             }
         } catch (err) {
             setError("Something went wrong");

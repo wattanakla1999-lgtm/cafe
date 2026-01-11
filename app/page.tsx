@@ -7,7 +7,7 @@ import { useAuth } from "../context/AuthContext";
 import { OrderQRModal } from "../components/OrderQRModal";
 
 export default function Home() {
-  const { user, logout } = useAuth();
+  const { user, logout, isLoading } = useAuth();
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -17,6 +17,17 @@ export default function Home() {
     await logout();
     // No need to set false, router will redirect
   };
+
+  if (isLoading) {
+    return (
+      <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)]">
+        <div className="flex flex-col items-center gap-4">
+          <div className="w-12 h-12 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+          <p className="text-[var(--color-coffee-600)] animate-pulse">กำลังโหลด...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[var(--color-background)]">
