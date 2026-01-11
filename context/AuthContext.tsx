@@ -38,20 +38,22 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const profileFetchPromiseRef = React.useRef<Promise<any> | null>(null);
 
     // Fetch user profile (store info)
-    const loadStoreProfile = async (authUser: SupabaseUser) => {
+    const loadStoreProfile = async (authUser: SupabaseUser, retryCount = 0): Promise<User | null> => {
         // Dedup: If a fetch is already running for this user, return the existing promise
-        if (profileFetchPromiseRef.current) {
+        // Only dedup on the first try to avoid locking out retries
+        if (profileFetchPromiseRef.current && retryCount === 0) {
             return profileFetchPromiseRef.current;
         }
 
         const fetchOp = async () => {
+            let timeoutId: NodeJS.Timeout | null = null;
             try {
-                console.log("Loading store profile...");
+                console.log(`Loading store profile (Attempt ${retryCount + 1})...`);
 
                 // Shortened timeout to 7s for better UX
-                const timeoutPromise = new Promise((_, reject) =>
-                    setTimeout(() => reject(new Error("Profile load timed out")), 7000)
-                );
+                const timeoutPromise = new Promise((_, reject) => {
+                    timeoutId = setTimeout(() => reject(new Error("Profile load timed out")), 7000);
+                });
 
                 const dbPromise = supabase
                     .from("stores")
@@ -66,7 +68,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return null;
                 }
 
-                if (!stores) return null;
+                if (!stores) {
+                    // RETRY LOGIC: If store not found, it might be because the Trigger is still running.
+                    // Retry up to 3 times, waiting 1 second between tries.
+                    if (retryCount < 3) {
+                        console.warn(`Store not found for user ${authUser.id}, retrying in 1s... (${retryCount + 1}/3)`);
+                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        return loadStoreProfile(authUser, retryCount + 1);
+                    }
+                    return null;
+                }
 
                 return {
                     id: authUser.id,
@@ -78,13 +89,21 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.error("Profile fetch exception:", e);
                 return null;
             } finally {
-                // Clean up the lock
-                profileFetchPromiseRef.current = null;
+                // Clean up the lock only if we are the "root" caller or if retries are done
+                if (timeoutId) clearTimeout(timeoutId);
+                if (retryCount === 0) {
+                    profileFetchPromiseRef.current = null;
+                }
             }
         };
 
-        profileFetchPromiseRef.current = fetchOp();
-        return profileFetchPromiseRef.current;
+        // Only cache the promise if it's the initial call
+        if (retryCount === 0) {
+            profileFetchPromiseRef.current = fetchOp();
+            return profileFetchPromiseRef.current;
+        } else {
+            return fetchOp();
+        }
     };
 
     // Initialize session

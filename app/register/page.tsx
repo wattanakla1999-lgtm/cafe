@@ -51,9 +51,9 @@ export default function RegisterPage() {
             }
         } catch (err) {
             setError("Something went wrong");
-        } finally {
-            setIsLoading(false);
+            setIsLoading(false); // Only stop loading on error
         }
+        // Do NOT stop loading on success, wait for router.push to complete
     };
 
     return (
