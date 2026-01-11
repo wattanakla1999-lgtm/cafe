@@ -15,6 +15,104 @@ import { ToppingManagerModal } from "../../../components/ToppingManagerModal";
 import { StoreSettingsModal } from "../../../components/StoreSettingsModal";
 import { ProtectedRoute } from "../../../components/ProtectedRoute";
 
+// Helper Component for Mobile Dropdown
+function MenuDropdown({
+    onOpenSettings,
+    onOpenDiscounts,
+    onOpenCategories,
+    onOpenToppings,
+    onOpenServingTypes
+}: {
+    onOpenSettings: () => void;
+    onOpenDiscounts: () => void;
+    onOpenCategories: () => void;
+    onOpenToppings: () => void;
+    onOpenServingTypes: () => void;
+}) {
+    const [isOpen, setIsOpen] = useState(false);
+
+    // Close dropdown when clicking outside (simple implementation using overlay)
+    useEffect(() => {
+        if (isOpen) {
+            const handleEsc = (e: KeyboardEvent) => {
+                if (e.key === 'Escape') setIsOpen(false);
+            };
+            window.addEventListener('keydown', handleEsc);
+            return () => window.removeEventListener('keydown', handleEsc);
+        }
+    }, [isOpen]);
+
+    return (
+        <>
+            {isOpen && (
+                <div
+                    className="fixed inset-0 z-20 cursor-default"
+                    onClick={() => setIsOpen(false)}
+                />
+            )}
+            <div className="relative z-30">
+                <Button variant="outline" onClick={() => setIsOpen(!isOpen)} className="!p-2 shadow-sm">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                        <path d="M10 6a2 2 0 110-4 2 2 0 010 4zM10 12a2 2 0 110-4 2 2 0 010 4zM10 18a2 2 0 110-4 2 2 0 010 4z" />
+                    </svg>
+                </Button>
+
+                {isOpen && (
+                    <div className="absolute right-0 mt-2 w-48 bg-white rounded-xl shadow-xl border border-[var(--color-coffee-100)] overflow-hidden animate-in fade-in zoom-in-95 duration-100 origin-top-right">
+                        <div className="py-1">
+                            <button
+                                onClick={() => { onOpenSettings(); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-3 hover:bg-[var(--color-coffee-50)] text-[var(--color-coffee-700)] text-sm font-medium flex items-center gap-2 border-b border-gray-50"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                </svg>
+                                ตั้งค่าร้านค้า
+                            </button>
+                            <button
+                                onClick={() => { onOpenDiscounts(); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-3 hover:bg-[var(--color-coffee-50)] text-[var(--color-coffee-700)] text-sm font-medium flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                                </svg>
+                                ส่วนลด
+                            </button>
+                            <button
+                                onClick={() => { onOpenCategories(); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-3 hover:bg-[var(--color-coffee-50)] text-[var(--color-coffee-700)] text-sm font-medium flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                </svg>
+                                หมวดหมู่
+                            </button>
+                            <button
+                                onClick={() => { onOpenToppings(); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-3 hover:bg-[var(--color-coffee-50)] text-[var(--color-coffee-700)] text-sm font-medium flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                                </svg>
+                                ท็อปปิ้ง
+                            </button>
+                            <button
+                                onClick={() => { onOpenServingTypes(); setIsOpen(false); }}
+                                className="w-full text-left px-4 py-3 hover:bg-[var(--color-coffee-50)] text-[var(--color-coffee-700)] text-sm font-medium flex items-center gap-2"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                                </svg>
+                                รูปแบบการเสิร์ฟ
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </>
+    );
+}
+
 function MenuContent() {
     const { menuItems, categories: contextCategories, addMenuItem, updateMenuItem, deleteMenuItem, isLoading } = useMenu();
     const searchParams = useSearchParams();
@@ -108,36 +206,51 @@ function MenuContent() {
                     </div>
 
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2" title="ตั้งค่าร้านค้า">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
-                            </svg>
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsDiscountManagerOpen(true)} className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
-                            </svg>
-                            <span className="hidden sm:inline">ส่วนลด</span>
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsManagerOpen(true)} className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
-                            </svg>
-                            <span>หมวดหมู่</span>
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsToppingManagerOpen(true)} className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                            </svg>
-                            <span className="hidden sm:inline">ท็อปปิ้ง</span>
-                        </Button>
-                        <Button variant="outline" onClick={() => setIsServingTypeManagerOpen(true)} className="flex items-center gap-2">
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
-                            </svg>
-                            <span className="hidden sm:inline">รูปแบบ</span>
-                        </Button>
-                        <Button variant="primary" onClick={handleAddNew} className="flex items-center gap-2 shadow-lg shadow-orange-100">
+                        {/* Desktop Menu (Hidden on small screens) */}
+                        <div className="hidden md:flex gap-2">
+                            <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2" title="ตั้งค่าร้านค้า">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
+                                </svg>
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsDiscountManagerOpen(true)} className="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
+                                </svg>
+                                <span>ส่วนลด</span>
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsManagerOpen(true)} className="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
+                                </svg>
+                                <span>หมวดหมู่</span>
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsToppingManagerOpen(true)} className="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                                </svg>
+                                <span>ท็อปปิ้ง</span>
+                            </Button>
+                            <Button variant="outline" onClick={() => setIsServingTypeManagerOpen(true)} className="flex items-center gap-2">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                                </svg>
+                                <span>รูปแบบ</span>
+                            </Button>
+                        </div>
+
+                        {/* Mobile Dropdown Menu */}
+                        <div className="relative md:hidden">
+                            <MenuDropdown
+                                onOpenSettings={() => setIsSettingsOpen(true)}
+                                onOpenDiscounts={() => setIsDiscountManagerOpen(true)}
+                                onOpenCategories={() => setIsManagerOpen(true)}
+                                onOpenToppings={() => setIsToppingManagerOpen(true)}
+                                onOpenServingTypes={() => setIsServingTypeManagerOpen(true)}
+                            />
+                        </div>
+
+                        <Button variant="primary" onClick={handleAddNew} className="flex items-center gap-2 shadow-lg shadow-orange-100 px-3 sm:px-4">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                             </svg>
