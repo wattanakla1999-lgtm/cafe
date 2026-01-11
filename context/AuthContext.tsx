@@ -146,7 +146,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 data: {
                     full_name: name,
                     store_name: storeName
-                }
+                },
+                emailRedirectTo: `${window.location.origin}/login`
             }
         });
 
