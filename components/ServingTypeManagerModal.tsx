@@ -122,6 +122,7 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
                                 <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อรูปแบบ</label>
                                 <input
                                     type="text"
+                                    maxLength={50}
                                     value={formData.name}
                                     onChange={(e) => setFormData({ ...formData, name: e.target.value })}
                                     placeholder="เช่น ร้อน, เย็น"
@@ -134,6 +135,7 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
                                 <input
                                     type="number"
                                     min="0"
+                                    max="1000000"
                                     value={formData.price}
                                     onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
                                     className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"

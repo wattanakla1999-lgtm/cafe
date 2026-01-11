@@ -90,6 +90,7 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
                         <label className="block text-sm font-bold text-[var(--color-coffee-700)]">ชื่อร้านค้า</label>
                         <input
                             type="text"
+                            maxLength={100}
                             value={storeName}
                             onChange={(e) => setStoreName(e.target.value)}
                             className="w-full p-3 rounded-lg border border-[var(--color-coffee-200)] focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"

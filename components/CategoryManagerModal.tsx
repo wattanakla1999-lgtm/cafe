@@ -124,6 +124,7 @@ export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalPr
                                 <input
                                     type="text"
                                     value={categoryName}
+                                    maxLength={50}
                                     onChange={(e) => setCategoryName(e.target.value)}
                                     placeholder="เช่น กาแฟ"
                                     className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"

@@ -197,6 +197,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                         <input
                             type="text"
                             required
+                            maxLength={100}
                             value={formData.name}
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                             className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
@@ -210,6 +211,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                             type="number"
                             min="0"
                             step="0.01"
+                            max="1000000"
                             required
                             value={formData.price}
                             onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
@@ -245,6 +247,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                         <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">รายละเอียด</label>
                         <textarea
                             value={formData.description}
+                            maxLength={500}
                             onChange={e => setFormData({ ...formData, description: e.target.value })}
                             className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                             rows={3}

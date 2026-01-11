@@ -148,6 +148,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                                 <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อส่วนลด</label>
                                 <input
                                     type="text"
+                                    maxLength={100}
                                     placeholder="เช่น ลด 10%"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
@@ -160,6 +161,8 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                                     <input
                                         type="number"
                                         placeholder="0"
+                                        min="0"
+                                        max={type === "percent" ? 100 : 1000000}
                                         value={value}
                                         onChange={(e) => setValue(Number(e.target.value))}
                                         className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"

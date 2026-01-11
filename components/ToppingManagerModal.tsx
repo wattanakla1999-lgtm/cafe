@@ -134,6 +134,7 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
                                 <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อท็อปปิ้ง</label>
                                 <input
                                     type="text"
+                                    maxLength={50}
                                     value={newName}
                                     onChange={(e) => setNewName(e.target.value)}
                                     placeholder="เช่น เพิ่มช็อต"
@@ -144,6 +145,7 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
                                 <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ราคา (฿)</label>
                                 <input
                                     type="number"
+                                    max="1000000"
                                     value={newPrice}
                                     onChange={(e) => setNewPrice(e.target.value)}
                                     placeholder="0"

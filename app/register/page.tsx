@@ -76,6 +76,7 @@ export default function RegisterPage() {
                         <input
                             type="text"
                             required
+                            maxLength={100}
                             value={storeName}
                             onChange={(e) => setStoreName(e.target.value)}
                             className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
@@ -88,6 +89,7 @@ export default function RegisterPage() {
                         <input
                             type="text"
                             required
+                            maxLength={100}
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
@@ -100,6 +102,7 @@ export default function RegisterPage() {
                         <input
                             type="email"
                             required
+                            maxLength={255}
                             value={email}
                             onChange={(e) => setEmail(e.target.value)}
                             className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
@@ -113,6 +116,7 @@ export default function RegisterPage() {
                             <input
                                 type="password"
                                 required
+                                maxLength={100}
                                 value={password}
                                 onChange={(e) => setPassword(e.target.value)}
                                 className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
@@ -124,6 +128,7 @@ export default function RegisterPage() {
                             <input
                                 type="password"
                                 required
+                                maxLength={100}
                                 value={confirmPassword}
                                 onChange={(e) => setConfirmPassword(e.target.value)}
                                 className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
