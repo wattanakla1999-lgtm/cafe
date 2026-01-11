@@ -45,23 +45,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return profileFetchPromiseRef.current;
         }
 
-        const fetchOp = async () => {
-            let timeoutId: NodeJS.Timeout | null = null;
+        const fetchOp = async (): Promise<User | null> => {
             try {
                 console.log(`Loading store profile (Attempt ${retryCount + 1})...`);
 
-                // Shortened timeout to 7s for better UX
-                const timeoutPromise = new Promise((_, reject) => {
-                    timeoutId = setTimeout(() => reject(new Error("Profile load timed out")), 7000);
-                });
-
-                const dbPromise = supabase
+                const { data: stores, error } = await supabase
                     .from("stores")
                     .select("id, name")
                     .eq("user_id", authUser.id)
                     .maybeSingle();
-
-                const { data: stores, error } = await Promise.race([dbPromise, timeoutPromise]) as any;
 
                 if (error) {
                     console.error("Store fetch error:", error);
@@ -70,10 +62,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (!stores) {
                     // RETRY LOGIC: If store not found, it might be because the Trigger is still running.
-                    // Retry up to 3 times, waiting 1 second between tries.
+                    // Retry up to 3 times, waiting 1.5 seconds between tries.
                     if (retryCount < 3) {
-                        console.warn(`Store not found for user ${authUser.id}, retrying in 1s... (${retryCount + 1}/3)`);
-                        await new Promise(resolve => setTimeout(resolve, 1000));
+                        console.warn(`Store not found for user ${authUser.id}, retrying in 1.5s... (${retryCount + 1}/3)`);
+                        await new Promise(resolve => setTimeout(resolve, 1500));
                         return loadStoreProfile(authUser, retryCount + 1);
                     }
                     return null;
@@ -89,8 +81,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 console.error("Profile fetch exception:", e);
                 return null;
             } finally {
-                // Clean up the lock only if we are the "root" caller or if retries are done
-                if (timeoutId) clearTimeout(timeoutId);
+                // Clean up the lock only if we are the "root" caller
                 if (retryCount === 0) {
                     profileFetchPromiseRef.current = null;
                 }
@@ -154,22 +145,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         try {
-            // Wrap login in a timeout too, in case Supabase client hangs
-            const loginPromise = supabase.auth.signInWithPassword({
+            // Call Supabase directly without Promise.race timeout
+            // Supabase client handles its own internal timeouts
+            const { data, error } = await supabase.auth.signInWithPassword({
                 email: email.trim(),
                 password
             });
 
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Login request timed out")), 10000)
-            );
-
-            const result = await Promise.race([loginPromise, timeoutPromise]) as any;
-
-            // Handle Login Result
-            const { data, error } = result;
-
             if (error) {
+                console.error("Login Supabase error:", error.message);
                 return { success: false, error: error.message };
             }
 
@@ -179,7 +163,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                 if (!profile) {
                     await supabase.auth.signOut();
-                    return { success: false, error: "ไม่พบข้อมูลร้านค้า หรือเครือข่ายมีปัญหา (Network/Store Error)" };
+                    return { success: false, error: "ไม่พบข้อมูลร้านค้า กรุณาลองอีกครั้งหรือติดต่อผู้ดูแลระบบ" };
                 }
 
                 // Force update user immediately
@@ -187,9 +171,10 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             }
 
             return { success: true };
-        } catch (err) {
+        } catch (err: any) {
             console.error("Login fatal error:", err);
-            return { success: false, error: "การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่ (Timeout)" };
+            // Return the actual error message, not a generic timeout message
+            return { success: false, error: err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ" };
         }
     };
 
