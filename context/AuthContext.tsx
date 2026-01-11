@@ -37,63 +37,47 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Keep track of ongoing profile fetches to prevent race conditions/double-fetching
     const profileFetchPromiseRef = React.useRef<Promise<any> | null>(null);
 
-    // Fetch user profile (store info)
+    // Fetch user profile (store info) - Simplified version without complex deduplication
     const loadStoreProfile = async (authUser: SupabaseUser, retryCount = 0): Promise<User | null> => {
-        // Dedup: If a fetch is already running for this user, return the existing promise
-        // Only dedup on the first try to avoid locking out retries
-        if (profileFetchPromiseRef.current && retryCount === 0) {
-            return profileFetchPromiseRef.current;
-        }
+        try {
+            console.log(`Loading store profile (Attempt ${retryCount + 1})...`);
 
-        const fetchOp = async (): Promise<User | null> => {
-            try {
-                console.log(`Loading store profile (Attempt ${retryCount + 1})...`);
+            const { data: stores, error } = await supabase
+                .from("stores")
+                .select("id, name")
+                .eq("user_id", authUser.id)
+                .maybeSingle();
 
-                const { data: stores, error } = await supabase
-                    .from("stores")
-                    .select("id, name")
-                    .eq("user_id", authUser.id)
-                    .maybeSingle();
+            console.log("Store query result:", { stores, error });
 
-                if (error) {
-                    console.error("Store fetch error:", error);
-                    return null;
-                }
-
-                if (!stores) {
-                    // RETRY LOGIC: If store not found, it might be because the Trigger is still running.
-                    // Retry up to 3 times, waiting 1.5 seconds between tries.
-                    if (retryCount < 3) {
-                        console.warn(`Store not found for user ${authUser.id}, retrying in 1.5s... (${retryCount + 1}/3)`);
-                        await new Promise(resolve => setTimeout(resolve, 1500));
-                        return loadStoreProfile(authUser, retryCount + 1);
-                    }
-                    return null;
-                }
-
-                return {
-                    id: authUser.id,
-                    email: authUser.email!,
-                    storeName: stores.name,
-                    storeId: stores.id
-                };
-            } catch (e) {
-                console.error("Profile fetch exception:", e);
+            if (error) {
+                console.error("Store fetch error:", error);
                 return null;
-            } finally {
-                // Clean up the lock only if we are the "root" caller
-                if (retryCount === 0) {
-                    profileFetchPromiseRef.current = null;
-                }
             }
-        };
 
-        // Only cache the promise if it's the initial call
-        if (retryCount === 0) {
-            profileFetchPromiseRef.current = fetchOp();
-            return profileFetchPromiseRef.current;
-        } else {
-            return fetchOp();
+            if (!stores) {
+                // RETRY LOGIC: If store not found, it might be because the Trigger is still running.
+                // Retry up to 3 times, waiting 1.5 seconds between tries.
+                if (retryCount < 3) {
+                    console.warn(`Store not found for user ${authUser.id}, retrying in 1.5s... (${retryCount + 1}/3)`);
+                    await new Promise(resolve => setTimeout(resolve, 1500));
+                    return loadStoreProfile(authUser, retryCount + 1);
+                }
+                console.error("Store not found after 3 retries");
+                return null;
+            }
+
+            const profile = {
+                id: authUser.id,
+                email: authUser.email!,
+                storeName: stores.name,
+                storeId: stores.id
+            };
+            console.log("Profile loaded successfully:", profile.email);
+            return profile;
+        } catch (e) {
+            console.error("Profile fetch exception:", e);
+            return null;
         }
     };
 
