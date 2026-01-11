@@ -37,33 +37,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Fetch user profile (store info)
     const loadStoreProfile = async (authUser: SupabaseUser) => {
         try {
-            console.log("Loading store profile..."); // Debug log to confirm new code
-            const { data: stores, error } = await supabase
+            console.log("Loading store profile...");
+
+            // Create a timeout promise
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Request timed out")), 10000)
+            );
+
+            // Database query promise
+            const dbPromise = supabase
                 .from("stores")
                 .select("id, name")
                 .eq("user_id", authUser.id)
-                .maybeSingle(); // Suppress error for missing store
+                .maybeSingle();
+
+            // Race the query against the timeout
+            const { data: stores, error } = await Promise.race([dbPromise, timeoutPromise]) as any;
 
             if (error) {
-                // If any error occurs (e.g. multiple rows, connection issue), treat as no store found
+                console.error("Store fetch error:", error);
+                // Return null but log the error. This will result in specific handling if needed.
                 return null;
             }
 
-            // If no store found (stores is null), usually means data integrity issue or new user not set up
+            // If no store found (stores is null)
             if (!stores) return null;
 
-            if (stores) {
-                return {
-                    id: authUser.id,
-                    email: authUser.email!,
-                    storeName: stores.name,
-                    storeId: stores.id
-                };
-            }
+            return {
+                id: authUser.id,
+                email: authUser.email!,
+                storeName: stores.name,
+                storeId: stores.id
+            };
         } catch (e) {
-            console.error("Profile fetch error:", e);
+            console.error("Profile fetch exception:", e);
+            // If it's a timeout, we might want to let the caller know, but returning null ensures safety for now.
+            // Ideally should throw so 'login' knows it was a network issue.
+            return null;
         }
-        return null;
     };
 
     // Initialize session
@@ -127,13 +138,20 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         // Verify that the user actually has a store profile
         if (data.user) {
             const profile = await loadStoreProfile(data.user);
+
             if (!profile) {
+                // Determine if it was a network error or missing store?
+                // For now, assume missing store to be safe, but we could improve this.
                 await supabase.auth.signOut();
-                return { success: false, error: "ไม่พบข้อมูลร้านค้า (Store not found)" };
+                return { success: false, error: "ไม่พบข้อมูลร้านค้า หรือการเชื่อมต่อขัดข้อง (Store not found or Connection failed)" };
             }
+
+            // OPTIMIZATION: Set user immediately! 
+            // This prevents the race condition where redirect happens before onAuthStateChange fires.
+            // onAuthStateChange has a check to avoid re-setting if IDs match.
+            setUser(profile);
         }
 
-        // Profile will be loaded by onAuthStateChange
         return { success: true };
     };
 
