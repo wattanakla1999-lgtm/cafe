@@ -37,27 +37,46 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Keep track of ongoing profile fetches to prevent race conditions/double-fetching
     const profileFetchPromiseRef = React.useRef<Promise<any> | null>(null);
 
-    // Fetch user profile (store info) - Simplified version without complex deduplication
+    // Fetch user profile (store info) using direct fetch to bypass Supabase client state issues
     const loadStoreProfile = async (authUser: SupabaseUser, retryCount = 0): Promise<User | null> => {
         try {
             console.log(`Loading store profile (Attempt ${retryCount + 1})...`);
 
-            const { data: stores, error } = await supabase
-                .from("stores")
-                .select("id, name")
-                .eq("user_id", authUser.id)
-                .maybeSingle();
+            // Get current session for access token
+            const { data: { session } } = await supabase.auth.getSession();
+            console.log("Session for store query:", session ? "exists" : "null");
 
-            console.log("Store query result:", { stores, error });
-
-            if (error) {
-                console.error("Store fetch error:", error);
+            if (!session) {
+                console.error("No session available for store query");
                 return null;
             }
 
-            if (!stores) {
+            // Use direct fetch instead of Supabase client to avoid potential state issues
+            const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+            const response = await fetch(
+                `${supabaseUrl}/rest/v1/stores?user_id=eq.${authUser.id}&select=id,name`,
+                {
+                    method: 'GET',
+                    headers: {
+                        'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
+                        'Authorization': `Bearer ${session.access_token}`,
+                        'Content-Type': 'application/json',
+                    },
+                }
+            );
+
+            console.log("Store fetch response status:", response.status);
+
+            if (!response.ok) {
+                console.error("Store fetch failed:", response.status, response.statusText);
+                return null;
+            }
+
+            const stores = await response.json();
+            console.log("Store query result:", stores);
+
+            if (!stores || stores.length === 0) {
                 // RETRY LOGIC: If store not found, it might be because the Trigger is still running.
-                // Retry up to 3 times, waiting 1.5 seconds between tries.
                 if (retryCount < 3) {
                     console.warn(`Store not found for user ${authUser.id}, retrying in 1.5s... (${retryCount + 1}/3)`);
                     await new Promise(resolve => setTimeout(resolve, 1500));
@@ -67,11 +86,12 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 return null;
             }
 
+            const store = stores[0];
             const profile = {
                 id: authUser.id,
                 email: authUser.email!,
-                storeName: stores.name,
-                storeId: stores.id
+                storeName: store.name,
+                storeId: store.id
             };
             console.log("Profile loaded successfully:", profile.email);
             return profile;
