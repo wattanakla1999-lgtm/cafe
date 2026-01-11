@@ -97,11 +97,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    // Initialize session
+    // Initialize session with retry for AbortError (common on iOS Safari/Mobile Chrome)
     useEffect(() => {
         let mounted = true;
 
-        const initSession = async () => {
+        const initSession = async (retryCount = 0): Promise<void> => {
             try {
                 const { data: { session } } = await supabase.auth.getSession();
 
@@ -109,7 +109,13 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     const profile = await loadStoreProfile(session.user);
                     if (mounted) setUser(profile);
                 }
-            } catch (error) {
+            } catch (error: any) {
+                // Handle AbortError with retry (common on mobile browsers)
+                if (error?.name === 'AbortError' && retryCount < 2) {
+                    console.warn(`Session init aborted, retrying... (${retryCount + 1}/2)`);
+                    await new Promise(resolve => setTimeout(resolve, 500));
+                    return initSession(retryCount + 1);
+                }
                 console.error("Session init error:", error);
             } finally {
                 if (mounted) setIsLoading(false);
@@ -125,8 +131,15 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const currentUser = userRef.current;
                 // Only load if user changed or we don't have one
                 if (!currentUser || currentUser.id !== session.user.id) {
-                    const profile = await loadStoreProfile(session.user);
-                    if (mounted) setUser(profile);
+                    try {
+                        const profile = await loadStoreProfile(session.user);
+                        if (mounted) setUser(profile);
+                    } catch (e: any) {
+                        // Silently handle AbortError in auth state change
+                        if (e?.name !== 'AbortError') {
+                            console.error("Profile load error:", e);
+                        }
+                    }
                 }
             } else {
                 if (mounted) setUser(null);

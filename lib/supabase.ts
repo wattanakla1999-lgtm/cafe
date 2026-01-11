@@ -9,4 +9,13 @@ if (!supabaseUrl || !supabaseAnonKey) {
     console.error("Missing Supabase environment variables");
 }
 
-export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey);
+export const supabase = createBrowserClient(supabaseUrl, supabaseAnonKey, {
+    global: {
+        fetch: (url, options) => {
+            // Disable AbortController signal for Supabase requests
+            // This fixes "operation was aborted" errors on Vercel Edge Runtime
+            const { signal, ...restOptions } = options || {};
+            return fetch(url, restOptions);
+        }
+    }
+});
