@@ -37,15 +37,14 @@ export async function middleware(request: NextRequest) {
 
     const requestUrl = new URL(request.url)
 
-    // Protected routes
+    // Protected routes - redirect to login if not authenticated
     if (!user && !['/login', '/register', '/menu', '/receipt', '/cart', '/receipt-selection', '/history'].includes(requestUrl.pathname)) {
         return NextResponse.redirect(new URL('/login', request.url))
     }
 
-    // Auth routes (redirect to home if already logged in)
-    if (user && ['/login', '/register'].includes(requestUrl.pathname)) {
-        return NextResponse.redirect(new URL('/', request.url))
-    }
+    // REMOVED: Auto-redirect for logged-in users on auth pages
+    // This was causing AbortError by redirecting too fast during login
+    // The frontend now handles this redirect after profile loading is complete
 
     return response
 }
