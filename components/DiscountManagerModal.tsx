@@ -88,7 +88,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
             <div className="bg-white rounded-2xl w-full max-w-lg overflow-hidden shadow-2xl animate-in zoom-in-95 duration-200">
                 <div className="p-4 border-b border-[var(--color-coffee-100)] flex justify-between items-center bg-[var(--color-coffee-50)]">
                     <h2 className="text-xl font-bold text-[var(--color-coffee-900)]">
-                        {mode === "list" ? "Manage Discounts" : mode === "add" ? "New Discount" : "Edit Discount"}
+                        {mode === "list" ? "จัดการส่วนลด" : mode === "add" ? "เพิ่มส่วนลดใหม่" : "แก้ไขส่วนลด"}
                     </h2>
                     <button
                         onClick={onClose}
@@ -104,7 +104,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                     {mode === "list" ? (
                         <div className="space-y-2">
                             {discounts.length === 0 ? (
-                                <div className="text-center text-[var(--color-coffee-400)] text-sm py-8">No discounts created</div>
+                                <div className="text-center text-[var(--color-coffee-400)] text-sm py-8">ยังไม่มีส่วนลด</div>
                             ) : (
                                 discounts.map((discount) => (
                                     <div key={discount.id} className="flex items-center justify-between p-3 bg-white border border-[var(--color-coffee-100)] rounded-xl shadow-sm">
@@ -116,7 +116,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                                             <div>
                                                 <div className="font-bold text-[var(--color-coffee-800)]">{discount.name}</div>
                                                 <div className="text-xs text-[var(--color-coffee-500)]">
-                                                    {discount.type === 'percent' ? `${discount.value}% Off` : `฿${discount.value} Off`}
+                                                    {discount.type === 'percent' ? `ลด ${discount.value}%` : `ลด ฿${discount.value}`}
                                                 </div>
                                             </div>
                                         </div>
@@ -145,10 +145,10 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                     ) : (
                         <div className="bg-[var(--color-coffee-50)] p-4 rounded-xl space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Name</label>
+                                <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อส่วนลด</label>
                                 <input
                                     type="text"
-                                    placeholder="e.g. 10% Off"
+                                    placeholder="เช่น ลด 10%"
                                     value={name}
                                     onChange={(e) => setName(e.target.value)}
                                     className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
@@ -156,7 +156,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                             </div>
                             <div className="grid grid-cols-2 gap-4">
                                 <div>
-                                    <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Value</label>
+                                    <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">มูลค่า</label>
                                     <input
                                         type="number"
                                         placeholder="0"
@@ -166,14 +166,14 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                                     />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Type</label>
+                                    <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ประเภท</label>
                                     <select
                                         value={type}
                                         onChange={(e) => setType(e.target.value as "percent" | "amount")}
                                         className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg text-sm bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
                                     >
-                                        <option value="percent">% Off</option>
-                                        <option value="amount">฿ Off</option>
+                                        <option value="percent">% (เปอร์เซ็นต์)</option>
+                                        <option value="amount">฿ (บาท)</option>
                                     </select>
                                 </div>
                             </div>
@@ -185,13 +185,13 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                 <div className="p-4 border-t border-[var(--color-coffee-100)] bg-[var(--color-coffee-50)] flex gap-3">
                     {mode === "list" ? (
                         <>
-                            <Button fullWidth variant="outline" onClick={onClose}>Close</Button>
-                            <Button fullWidth onClick={handleStartAdd} variant="primary">Add New Discount</Button>
+                            <Button fullWidth variant="outline" onClick={onClose}>ปิด</Button>
+                            <Button fullWidth onClick={handleStartAdd} variant="primary">เพิ่มส่วนลด</Button>
                         </>
                     ) : (
                         <>
-                            <Button fullWidth variant="outline" onClick={() => setMode("list")}>Cancel</Button>
-                            <Button fullWidth onClick={handleSave} variant="primary">Save Discount</Button>
+                            <Button fullWidth variant="outline" onClick={() => setMode("list")}>ยกเลิก</Button>
+                            <Button fullWidth onClick={handleSave} variant="primary">บันทึก</Button>
                         </>
                     )}
                 </div>

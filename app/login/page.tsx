@@ -21,11 +21,11 @@ export default function LoginPage() {
         setIsLoading(true);
 
         try {
-            const success = await login(email, password);
-            if (success) {
+            const result = await login(email, password);
+            if (result.success) {
                 router.push("/");
             } else {
-                setError("Invalid email or password");
+                setError(result.error || "Invalid email or password");
             }
         } catch (err) {
             setError("Something went wrong");
@@ -39,7 +39,7 @@ export default function LoginPage() {
             <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 animate-scale-up">
                 <div className="text-center mb-8">
                     <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">Cafe System</h1>
-                    <p className="text-[var(--color-coffee-500)]">Sign in to manage your store</p>
+                    <p className="text-[var(--color-coffee-500)]">เข้าสู่ระบบเพื่อจัดการร้านค้าของคุณ</p>
                 </div>
 
                 {error && (
@@ -50,7 +50,7 @@ export default function LoginPage() {
 
                 <form onSubmit={handleLogin} className="space-y-6">
                     <div>
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Email</label>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">อีเมล</label>
                         <input
                             type="email"
                             required
@@ -62,7 +62,7 @@ export default function LoginPage() {
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Password</label>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">รหัสผ่าน</label>
                         <input
                             type="password"
                             required
@@ -80,14 +80,14 @@ export default function LoginPage() {
                         className="shadow-lg shadow-orange-200"
                         disabled={isLoading}
                     >
-                        {isLoading ? "Signing in..." : "Sign In"}
+                        {isLoading ? "กำลังเข้าสู่ระบบ..." : "เข้าสู่ระบบ"}
                     </Button>
                 </form>
 
                 <div className="mt-8 text-center text-sm text-[var(--color-coffee-600)]">
-                    Don't have a store yet?{" "}
+                    ยังไม่มีร้านค้า?{" "}
                     <Link href="/register" className="font-bold text-[var(--color-primary)] hover:underline">
-                        Create an account
+                        สร้างบัญชี
                     </Link>
                 </div>
             </div>

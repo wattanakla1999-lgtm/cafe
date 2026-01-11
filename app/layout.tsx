@@ -1,16 +1,16 @@
 import type { Metadata } from "next";
-import { Kanit } from "next/font/google";
+import { Prompt } from "next/font/google";
 import "./globals.css";
 
-const kanit = Kanit({
-  variable: "--font-kanit",
+const prompt = Prompt({
+  variable: "--font-prompt",
   subsets: ["thai", "latin"],
   weight: ["300", "400", "500", "600", "700"],
 });
 
 export const metadata: Metadata = {
-  title: "Cafe Order System",
-  description: "Simple ordering system for cafes",
+  title: "ระบบสั่งอาหารคาเฟ่",
+  description: "ระบบสั่งอาหารง่ายๆ สำหรับคาเฟ่",
 };
 
 import { Providers } from "../components/Providers";
@@ -21,8 +21,9 @@ export default function RootLayout({
   children: React.ReactNode;
 }>) {
   return (
-    <html lang="en">
-      <body className={`${kanit.variable} antialiased`}>
+    <html lang="th" className={`${prompt.variable}`}>
+      <body className="antialiased font-sans">
+        {/* Force Rebuild 1 */}
         <Providers>
           {children}
         </Providers>

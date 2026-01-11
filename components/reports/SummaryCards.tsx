@@ -8,7 +8,7 @@ interface SummaryCardsProps {
 export function SummaryCards({ summary }: SummaryCardsProps) {
     const cards = [
         {
-            label: "Total Sales",
+            label: "ยอดขายรวม",
             value: `฿${summary.totalSales.toLocaleString()}`,
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-green-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -18,7 +18,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             bg: "bg-green-50"
         },
         {
-            label: "Total Orders",
+            label: "จำนวนออเดอร์รวม",
             value: summary.totalOrders.toLocaleString(),
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-blue-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -28,7 +28,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             bg: "bg-blue-50"
         },
         {
-            label: "Cups Sold",
+            label: "จำนวนแก้วที่ขายได้",
             value: summary.cupsSold.toLocaleString(),
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-orange-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -38,7 +38,7 @@ export function SummaryCards({ summary }: SummaryCardsProps) {
             bg: "bg-orange-50"
         },
         {
-            label: "Best Seller",
+            label: "สินค้าขายดี",
             value: summary.topItem,
             icon: (
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-purple-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">

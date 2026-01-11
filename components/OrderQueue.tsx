@@ -11,6 +11,7 @@ interface OrderQueueProps {
 
 export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
     const { orders, completeOrder } = useOrder();
+    const [completingId, setCompletingId] = React.useState<string | null>(null);
 
     // Filter for pending orders and sort by timestamp (oldest first - FIFO)
     const pendingOrders = orders
@@ -24,7 +25,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
         >
             <div className="p-4 border-b border-[var(--color-coffee-100)] bg-[var(--color-coffee-50)] shrink-0 flex justify-between items-center min-w-[300px] md:min-w-[320px]">
                 <div className="flex items-center gap-3">
-                    <h2 className="font-bold text-lg text-[var(--color-coffee-900)]">Active Queue</h2>
+                    <h2 className="font-bold text-lg text-[var(--color-coffee-900)]">คิวปัจจุบัน</h2>
                     <span className="bg-[var(--color-primary)] text-white text-xs font-bold px-2 py-1 rounded-full">
                         {pendingOrders.length}
                     </span>
@@ -42,7 +43,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M5 13l4 4L19 7" />
                         </svg>
-                        <p className="text-sm font-medium">All caught up!</p>
+                        <p className="text-sm font-medium">ไม่มีคิวค้าง!</p>
                     </div>
                 ) : (
                     pendingOrders.map((order, index) => (
@@ -51,7 +52,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                             <div className="flex justify-between items-start mb-2">
                                 <div>
                                     <div className="flex items-center gap-2">
-                                        <span className="font-bold text-[var(--color-coffee-900)]">Order #{order.orderId}</span>
+                                        <span className="font-bold text-[var(--color-coffee-900)]">ออเดอร์ #{order.orderId}</span>
                                         <span className="text-[10px] bg-gray-100 text-gray-600 px-1.5 py-0.5 rounded border border-gray-200">
                                             {order.channel}
                                         </span>
@@ -96,9 +97,14 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                                 fullWidth
                                 size="sm"
                                 variant={index === 0 ? "primary" : "outline"}
-                                onClick={() => completeOrder(order.orderId)}
+                                onClick={async () => {
+                                    setCompletingId(order.id);
+                                    await completeOrder(order.id);
+                                    setCompletingId(null);
+                                }}
+                                disabled={completingId === order.id}
                             >
-                                {index === 0 ? "Serve Now" : "Mark Done"}
+                                {completingId === order.id ? "กำลังดำเนินการ..." : (index === 0 ? "เสิร์ฟเลย" : "เสร็จสิ้น")}
                             </Button>
                         </div>
                     ))

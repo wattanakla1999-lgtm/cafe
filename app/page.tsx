@@ -17,30 +17,38 @@ export default function Home() {
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-[var(--color-primary)]">Cafe System</h1>
           <p className="text-[var(--color-coffee-500)]">
-            {user ? `Welcome to ${user.storeName}` : "Store Management System"}
+            {user ? `ยินดีต้อนรับสู่ ${user.storeName}` : "ระบบจัดการร้านค้า"}
           </p>
         </div>
 
         <div className="grid gap-4">
 
           {/* Public / Customer Area */}
-          <Link href="/menu">
+          {/* <Link href="/menu">
             <Button fullWidth size="lg" variant="outline" className="border-dashed border-[var(--color-primary)] text-[var(--color-primary)]">
-              Scan QR (Customer View)
+              สแกน QR Code (มุมมองลูกค้า)
             </Button>
-          </Link>
+          </Link> */}
+
+
+          <div className="pt-4">
+            <Button fullWidth variant="outline" onClick={() => setIsQrOpen(true)}>
+              แสดง QRCode เพื่อสั่งเมนู
+            </Button>
+          </div>
+
 
           {!user ? (
             /* Guest View */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
               <Link href="/login">
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
-                  Login to Store
+                  เข้าสู่ระบบร้านค้า
                 </Button>
               </Link>
               <Link href="/register">
                 <Button fullWidth variant="ghost">
-                  Create New Store
+                  สร้างร้านค้าใหม่
                 </Button>
               </Link>
             </div>
@@ -49,40 +57,41 @@ export default function Home() {
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
               <Link href="/counter">
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
-                  Open Counter
+                  เปิดจุดชำระเงิน
                 </Button>
               </Link>
 
-              <Button fullWidth variant="outline" onClick={() => setIsQrOpen(true)}>
-                Show Table QR
-              </Button>
 
-              <div className="grid grid-cols-2 gap-3">
+
+              {/* <div className="grid grid-cols-2 gap-3">
                 <Link href="/orders">
                   <Button fullWidth variant="secondary">
-                    Kitchen
+                    ครัว
                   </Button>
                 </Link>
                 <Link href="/call">
                   <Button fullWidth variant="secondary">
-                    Calling
+                    เรียกคิว
+                  </Button>
+                </Link>
+              </div> */}
+
+              <div className="pt-4">
+                <Link href="/admin/menu">
+                  <Button fullWidth variant="outline">
+                    จัดการเมนู
                   </Button>
                 </Link>
               </div>
 
-              <Link href="/admin/menu">
-                <Button fullWidth variant="outline">
-                  Manager
-                </Button>
-              </Link>
-
               <div className="pt-4">
-                <button
+                <Button
                   onClick={logout}
-                  className="text-sm text-red-500 hover:underline font-medium"
+                  variant="outline"
+                  className="border-red-500 text-red-500 hover:bg-red-50 hover:text-red-700 hover:border-red-600"
                 >
-                  Logout of {user.storeName}
-                </button>
+                  ออกจากระบบ
+                </Button>
               </div>
             </div>
           )}

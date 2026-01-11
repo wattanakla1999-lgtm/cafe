@@ -2,19 +2,23 @@
 
 import React, { createContext, useContext, useState, useEffect } from "react";
 import { useRouter } from "next/navigation";
+import { supabase } from "../lib/supabase";
+import { User as SupabaseUser } from "@supabase/supabase-js";
 
 export interface User {
-    name: string;
+    id: string;
     email: string;
     storeName: string;
-    storeImage?: string; // Base64 image
+    storeId: string;
+    storeImage?: string | null;
 }
 
 interface AuthContextType {
     user: User | null;
-    login: (email: string, password: string) => Promise<boolean>;
-    register: (storeName: string, name: string, email: string, password: string, storeImage?: string) => Promise<boolean>;
-    logout: () => void;
+    isLoading: boolean;
+    login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    register: (storeName: string, name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    logout: () => Promise<void>;
     updateUser: (updates: Partial<User>) => void;
     isAuthenticated: boolean;
 }
@@ -23,99 +27,157 @@ const AuthContext = createContext<AuthContextType | undefined>(undefined);
 
 export function AuthProvider({ children }: { children: React.ReactNode }) {
     const [user, setUser] = useState<User | null>(null);
+    const [isLoading, setIsLoading] = useState(true);
     const router = useRouter();
 
-    // Check for persisted session on mount
-    useEffect(() => {
-        const savedUser = localStorage.getItem("cafe_user");
-        if (savedUser) {
-            try {
-                setUser(JSON.parse(savedUser));
-            } catch (e) {
-                console.error("Failed to parse user session", e);
-                localStorage.removeItem("cafe_user");
+    // Keep a ref to the current user to avoid stale closures in the subscription callback
+    const userRef = React.useRef<User | null>(null);
+    useEffect(() => { userRef.current = user; }, [user]);
+
+    // Fetch user profile (store info)
+    const loadStoreProfile = async (authUser: SupabaseUser) => {
+        try {
+            console.log("Loading store profile..."); // Debug log to confirm new code
+            const { data: stores, error } = await supabase
+                .from("stores")
+                .select("id, name")
+                .eq("user_id", authUser.id)
+                .maybeSingle(); // Suppress error for missing store
+
+            if (error) {
+                // If any error occurs (e.g. multiple rows, connection issue), treat as no store found
+                return null;
             }
+
+            // If no store found (stores is null), usually means data integrity issue or new user not set up
+            if (!stores) return null;
+
+            if (stores) {
+                return {
+                    id: authUser.id,
+                    email: authUser.email!,
+                    storeName: stores.name,
+                    storeId: stores.id
+                };
+            }
+        } catch (e) {
+            console.error("Profile fetch error:", e);
         }
-    }, []);
-
-    const login = async (email: string, password: string): Promise<boolean> => {
-        // Simulating API call
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                // Mock validation: In a real app, this would verify with backend
-                if (email && password) {
-                    const mockUser: User = {
-                        name: "Demo Owner",
-                        email: email, // Use provided email
-                        storeName: "My Demo Cafe", // Default for direct login
-                    };
-
-                    // If we have a registered user in memory/storage (mock), we should use that
-                    // For now, let's just create a session.
-
-                    // Check if there's a registered user in localStorage for demo purposes
-                    const registeredStore = localStorage.getItem("registered_store");
-                    if (registeredStore) {
-                        const parsed = JSON.parse(registeredStore);
-                        if (parsed.email === email) {
-                            mockUser.name = parsed.name;
-                            mockUser.storeName = parsed.storeName;
-                        }
-                    }
-
-                    setUser(mockUser);
-                    localStorage.setItem("cafe_user", JSON.stringify(mockUser));
-                    resolve(true);
-                } else {
-                    resolve(false);
-                }
-            }, 800);
-        });
+        return null;
     };
 
-    const register = async (storeName: string, name: string, email: string, password: string, storeImage?: string): Promise<boolean> => {
-        return new Promise((resolve) => {
-            setTimeout(() => {
-                const newUser: User = {
-                    name,
-                    email,
-                    storeName,
-                    storeImage
-                };
-                setUser(newUser);
-                localStorage.setItem("cafe_user", JSON.stringify(newUser));
-                // Save for login simulation
-                localStorage.setItem("registered_store", JSON.stringify({ ...newUser, password })); // Insecure, but fine for mock demo
-                resolve(true);
-            }, 1000);
+    // Initialize session
+    useEffect(() => {
+        let mounted = true;
+
+        const initSession = async () => {
+            try {
+                const { data: { session } } = await supabase.auth.getSession();
+
+                if (mounted && session?.user) {
+                    const profile = await loadStoreProfile(session.user);
+                    if (mounted) setUser(profile);
+                }
+            } catch (error) {
+                console.error("Session init error:", error);
+            } finally {
+                if (mounted) setIsLoading(false);
+            }
+        };
+
+        initSession();
+
+        const { data: { subscription } } = supabase.auth.onAuthStateChange(async (event, session) => {
+            console.log("Auth State Change:", event, session?.user?.id);
+
+            if (session?.user) {
+                // Check against ref to avoid stale closure
+                const currentUser = userRef.current;
+
+                // If we don't have a user, OR the auth user changed, fetch profile
+                if (!currentUser || currentUser.id !== session.user.id) {
+                    const profile = await loadStoreProfile(session.user);
+                    if (mounted) setUser(profile);
+                }
+            } else {
+                if (mounted) setUser(null);
+            }
+
+            if (event === "SIGNED_OUT") {
+                router.push("/login");
+            }
         });
+
+        return () => {
+            mounted = false;
+            subscription.unsubscribe();
+        };
+    }, [router]);
+
+    const login = async (email: string, password: string) => {
+        const { data, error } = await supabase.auth.signInWithPassword({
+            email: email.trim(),
+            password
+        });
+
+        if (error) {
+            return { success: false, error: error.message };
+        }
+
+        // Verify that the user actually has a store profile
+        if (data.user) {
+            const profile = await loadStoreProfile(data.user);
+            if (!profile) {
+                await supabase.auth.signOut();
+                return { success: false, error: "ไม่พบข้อมูลร้านค้า (Store not found)" };
+            }
+        }
+
+        // Profile will be loaded by onAuthStateChange
+        return { success: true };
+    };
+
+    const register = async (storeName: string, name: string, email: string, password: string) => {
+        // 1. Sign up user
+        const { data: authData, error: authError } = await supabase.auth.signUp({
+            email: email.trim(),
+            password,
+            options: {
+                data: {
+                    full_name: name,
+                    store_name: storeName
+                }
+            }
+        });
+
+        if (authError) {
+            return { success: false, error: authError.message };
+        }
+
+        // Store creation is now handled by a Database Trigger (see setup_trigger.sql)
+        // We don't need to manually insert into 'stores' anymore.
+
+        return { success: true };
+
+        return { success: false, error: "Registration failed" };
+    };
+
+    const logout = async () => {
+        await supabase.auth.signOut();
+        setUser(null);
+        router.push("/login"); // Force redirect
     };
 
     const updateUser = (updates: Partial<User>) => {
-        if (!user) return;
-        const updatedUser = { ...user, ...updates };
-        setUser(updatedUser);
-        localStorage.setItem("cafe_user", JSON.stringify(updatedUser));
-
-        // Also update registered store entry for persistence across re-logins in this mock
-        const registeredStore = localStorage.getItem("registered_store");
-        if (registeredStore) {
-            const parsed = JSON.parse(registeredStore);
-            if (parsed.email === user.email) {
-                localStorage.setItem("registered_store", JSON.stringify({ ...parsed, ...updates }));
-            }
+        if (user) {
+            setUser({ ...user, ...updates });
         }
-    };
-
-    const logout = () => {
-        setUser(null);
-        localStorage.removeItem("cafe_user");
-        router.push("/login");
     };
 
     return (
         <AuthContext.Provider value={{
             user,
+            isLoading,
             login,
             register,
             logout,

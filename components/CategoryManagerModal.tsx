@@ -81,7 +81,7 @@ export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalPr
             <div className="w-full max-w-md bg-white rounded-2xl shadow-xl overflow-hidden animate-in zoom-in-95 duration-200">
                 <div className="bg-[var(--color-coffee-50)] p-4 border-b border-[var(--color-coffee-100)] flex justify-between items-center">
                     <h3 className="font-bold text-lg text-[var(--color-coffee-900)]">
-                        {mode === "list" ? "Manage Categories" : mode === "add" ? "New Category" : "Edit Category"}
+                        {mode === "list" ? "จัดการหมวดหมู่" : mode === "add" ? "เพิ่มหมวดหมู่ใหม่" : "แก้ไขหมวดหมู่"}
                     </h3>
                     <button onClick={onClose} className="text-[var(--color-coffee-400)] hover:text-[var(--color-coffee-700)]">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -120,12 +120,12 @@ export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalPr
                     ) : (
                         <div className="space-y-4">
                             <div>
-                                <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Category Name</label>
+                                <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อหมวดหมู่</label>
                                 <input
                                     type="text"
                                     value={categoryName}
                                     onChange={(e) => setCategoryName(e.target.value)}
-                                    placeholder="e.g. Coffee"
+                                    placeholder="เช่น กาแฟ"
                                     className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
                                     autoFocus
                                 />
@@ -138,13 +138,13 @@ export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalPr
                 <div className="p-4 bg-[var(--color-coffee-50)] border-t border-[var(--color-coffee-100)] flex gap-3">
                     {mode === "list" ? (
                         <>
-                            <Button fullWidth variant="outline" onClick={onClose}>Close</Button>
-                            <Button fullWidth onClick={handleStartAdd} variant="primary">Add New Category</Button>
+                            <Button fullWidth variant="outline" onClick={onClose}>ปิด</Button>
+                            <Button fullWidth onClick={handleStartAdd} variant="primary">เพิ่มหมวดหมู่</Button>
                         </>
                     ) : (
                         <>
-                            <Button fullWidth variant="outline" onClick={() => setMode("list")}>Cancel</Button>
-                            <Button fullWidth onClick={handleSave} variant="primary">Save Category</Button>
+                            <Button fullWidth variant="outline" onClick={() => setMode("list")}>ยกเลิก</Button>
+                            <Button fullWidth onClick={handleSave} variant="primary">บันทึก</Button>
                         </>
                     )}
                 </div>

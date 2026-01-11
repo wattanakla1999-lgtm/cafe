@@ -11,15 +11,17 @@ interface OrderQRModalProps {
 
 export function OrderQRModal({ isOpen, onClose }: OrderQRModalProps) {
     const { user } = useAuth();
+    const [isDownloading, setIsDownloading] = React.useState(false);
 
     if (!isOpen) return null;
 
     // Use a public QR code generator API for the mock
     // In a real app, this would be generated locally or by the backend
-    // The target URL is the menu page
-    const targetUrl = typeof window !== 'undefined' ? `${window.location.origin}/menu` : '/menu';
+    // The target URL is the menu page with storeId
+    const targetUrl = typeof window !== 'undefined'
+        ? `${window.location.origin}/menu${user?.storeId ? `?storeId=${user.storeId}` : ''}`
+        : '/menu';
     const qrApiUrl = `https://api.qrserver.com/v1/create-qr-code/?size=250x250&data=${encodeURIComponent(targetUrl)}`;
-    const [isDownloading, setIsDownloading] = React.useState(false);
 
     const handleSimulateScan = () => {
         window.open(targetUrl, "_blank");
@@ -64,23 +66,22 @@ export function OrderQRModal({ isOpen, onClose }: OrderQRModalProps) {
                         {user?.storeImage && (
                             <img src={user.storeImage} alt="Store Logo" className="w-16 h-16 rounded-full object-cover border border-[var(--color-coffee-200)] shadow-sm" />
                         )}
-                        <h3 className="text-2xl font-bold text-[var(--color-coffee-900)]">Scan to Order</h3>
-                        <p className="text-[var(--color-coffee-600)] text-sm">Table 1</p>
+                        <h3 className="text-2xl font-bold text-[var(--color-coffee-900)]">สแกนเพื่อสั่ง</h3>
                     </div>
 
                     <div
                         className="bg-white p-4 rounded-xl border-2 border-dashed border-[var(--color-coffee-200)] mx-auto w-fit cursor-pointer hover:border-[var(--color-primary)] transition-colors group relative"
                         onClick={handleSimulateScan}
-                        title="Click to simulate client scan"
+                        title="คลิกเพื่อจำลองลูกค้าสแกน"
                     >
                         <img src={qrApiUrl} alt="Order QR Code" className="w-48 h-48 block" />
                         <div className="absolute inset-0 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity bg-black/5 pointer-events-none">
-                            <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-[var(--color-primary)] shadow-sm">Click to Test</span>
+                            <span className="bg-white px-3 py-1 rounded-full text-xs font-bold text-[var(--color-primary)] shadow-sm">คลิกเพื่อทดสอบ</span>
                         </div>
                     </div>
 
                     <p className="text-sm text-[var(--color-coffee-500)]">
-                        Show this QR code to customers to let them order from their phone.
+                        แสดง QR code นี้ให้ลูกค้าเพื่อสั่งรายการอาหาร
                     </p>
 
                     <div className="space-y-3">
@@ -94,10 +95,10 @@ export function OrderQRModal({ isOpen, onClose }: OrderQRModalProps) {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
                             </svg>
-                            {isDownloading ? "Downloading..." : "Download QR Image"}
+                            {isDownloading ? "กำลังดาวน์โหลด..." : "ดาวน์โหลดรูป QR"}
                         </Button>
                         <Button onClick={onClose} fullWidth variant="outline">
-                            Close
+                            ปิด
                         </Button>
                     </div>
                 </div>

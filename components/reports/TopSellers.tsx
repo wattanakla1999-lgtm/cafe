@@ -8,7 +8,7 @@ interface TopSellersProps {
 export function TopSellers({ items }: TopSellersProps) {
     return (
         <div className="bg-white rounded-2xl shadow-sm border border-[var(--color-coffee-100)] p-6 h-full">
-            <h3 className="text-lg font-bold text-[var(--color-coffee-900)] mb-4">Top 5 Best Sellers</h3>
+            <h3 className="text-lg font-bold text-[var(--color-coffee-900)] mb-4">5 อันดับสินค้าขายดี</h3>
             <div className="space-y-4">
                 {items.map((item) => (
                     <div key={item.name} className="flex items-center gap-4 p-3 hover:bg-[var(--color-coffee-50)] rounded-xl transition-colors border border-transparent hover:border-[var(--color-coffee-100)]">
@@ -23,7 +23,7 @@ export function TopSellers({ items }: TopSellersProps) {
                         </div>
                         <div className="flex-1 min-w-0">
                             <h4 className="font-bold text-[var(--color-coffee-900)] truncate">{item.name}</h4>
-                            <p className="text-xs text-[var(--color-coffee-500)]">{item.cups} cups sold</p>
+                            <p className="text-xs text-[var(--color-coffee-500)]">{item.cups} แก้ว</p>
                         </div>
                         <div className="text-right font-bold text-[var(--color-primary)]">
                             ฿{item.totalSales.toLocaleString()}
@@ -33,7 +33,7 @@ export function TopSellers({ items }: TopSellersProps) {
             </div>
             <div className="mt-6 pt-4 border-t border-[var(--color-coffee-100)] text-center">
                 <button className="text-sm text-[var(--color-primary)] font-bold hover:underline">
-                    View Full Menu Analysis
+                    ดูวิเคราะห์เมนูทั้งหมด
                 </button>
             </div>
         </div>

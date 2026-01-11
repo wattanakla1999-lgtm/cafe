@@ -2,27 +2,39 @@
 
 import React, { useState } from "react";
 import { useOrder } from "../../context/OrderContext";
+import { useMenu } from "../../context/MenuContext";
 import { Button } from "../../components/Button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 
 export default function CartPage() {
-    const { cart, removeFromCart } = useOrder();
+    const { cart, removeFromCart, submitOrder, isSubmitting } = useOrder();
+    const { publicStoreId } = useMenu();
     const router = useRouter();
 
     const total = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
-    const handleNext = () => {
-        router.push("/receipt-selection");
+    const handleConfirm = async () => {
+        if (isSubmitting) return;
+
+        // Use "Guest" as default name since we skipped logic to ask for name 
+        // (or we can assume name is "ลูกค้า" if anon)
+        const orderId = await submitOrder("ลูกค้า", "QR", publicStoreId || undefined);
+
+        if (orderId) {
+            router.push(`/receipt?id=${orderId}`);
+        } else {
+            alert("ไม่สามารถสร้างออเดอร์ได้ กรุณาลองใหม่อีกครั้ง");
+        }
     };
 
     if (cart.length === 0) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[var(--color-background)]">
                 <div className="text-center space-y-4">
-                    <p className="text-[var(--color-coffee-500)]">Your cart is empty</p>
+                    <p className="text-[var(--color-coffee-500)]">ตะกร้าของคุณว่างเปล่า</p>
                     <Link href="/menu">
-                        <Button variant="primary">Go to Menu</Button>
+                        <Button variant="primary">ไปที่เมนู</Button>
                     </Link>
                 </div>
             </div>
@@ -38,7 +50,7 @@ export default function CartPage() {
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
                     </svg>
                 </Link>
-                <h1 className="text-xl font-bold text-[var(--color-primary)]">Order Summary</h1>
+                <h1 className="text-xl font-bold text-[var(--color-primary)]">สรุปการสั่งซื้อ</h1>
             </div>
 
             <div className="p-4 space-y-6">
@@ -71,16 +83,16 @@ export default function CartPage() {
             {/* Footer */}
             <div className="fixed bottom-0 left-0 right-0 bg-white border-t border-[var(--color-coffee-100)] p-4 safe-area-bottom">
                 <div className="flex justify-between items-center mb-4 text-lg font-bold text-[var(--color-coffee-900)]">
-                    <span>Total</span>
+                    <span>รวมทั้งสิ้น</span>
                     <span className="text-[var(--color-primary)]">฿{total}</span>
                 </div>
                 <Button
                     fullWidth
                     size="lg"
-                    onClick={handleNext}
-                    disabled={cart.length === 0}
+                    onClick={handleConfirm}
+                    disabled={cart.length === 0 || isSubmitting}
                 >
-                    Next Step (Select Receipt)
+                    {isSubmitting ? "กำลังยืนยัน..." : "ยืนยัน Order"}
                 </Button>
             </div>
         </div>

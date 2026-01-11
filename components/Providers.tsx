@@ -5,6 +5,7 @@ import { MenuProvider } from "../context/MenuContext";
 import { AuthProvider } from "../context/AuthContext";
 
 import { NetworkStatus } from "./NetworkStatus";
+import { GlobalOrderAlert } from "./GlobalOrderAlert";
 
 export function Providers({ children }: { children: React.ReactNode }) {
     return (
@@ -12,6 +13,7 @@ export function Providers({ children }: { children: React.ReactNode }) {
             <MenuProvider>
                 <OrderProvider>
                     <NetworkStatus />
+                    <GlobalOrderAlert />
                     {children}
                 </OrderProvider>
             </MenuProvider>

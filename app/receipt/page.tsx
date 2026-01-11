@@ -1,32 +1,102 @@
 "use client";
 
 import React, { useEffect, useState } from "react";
-import { useOrder } from "../../context/OrderContext";
-import { useAuth } from "../../context/AuthContext";
+import { useSearchParams } from "next/navigation";
+import { supabase } from "../../lib/supabase";
 import { Button } from "../../components/Button";
 import Link from "next/link";
 import { Order } from "../../context/OrderContext";
 
 export default function ReceiptPage() {
-    const { orders } = useOrder();
-    const { user } = useAuth();
-    const [latestOrder, setLatestOrder] = useState<Order | null>(null);
+    const searchParams = useSearchParams();
+    const orderId = searchParams.get("id");
+    const [order, setOrder] = useState<Order | null>(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     useEffect(() => {
-        // Get the most recent order from the user's session logic.
-        // Since we just submitted, it's likely the first one in the list (if we prepended)
-        // or we can find one that matches our session. 
-        // For this Mock, we'll just take the top one.
-        if (orders.length > 0) {
-            setLatestOrder(orders[0]);
+        if (!orderId) {
+            setLoading(false);
+            return;
         }
-    }, [orders]);
 
-    if (!latestOrder) {
+        const fetchOrder = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from("orders")
+                    .select(`
+                        *,
+                        store:stores(name),
+                        order_items (
+                            *,
+                            menu_item:menu_items (
+                                id, name, price, image, description
+                            )
+                        )
+                    `)
+                    .eq("id", orderId)
+                    .single();
+
+                if (error) throw error;
+
+                if (data) {
+                    const mappedOrder: Order = {
+                        id: data.id,
+                        orderId: data.id.substring(0, 6).toUpperCase(),
+                        customerName: data.customer_name,
+                        totalAmount: data.total_amount,
+                        discount: data.discount_info,
+                        status: data.status,
+                        timestamp: new Date(data.created_at),
+                        channel: data.channel,
+                        items: data.order_items.map((oi: any) => ({
+                            itemId: oi.id,
+                            quantity: oi.quantity,
+                            totalPrice: oi.total_price,
+                            options: oi.options || [],
+                            menuItem: {
+                                id: oi.menu_item?.id || oi.menu_item_id,
+                                name: oi.name,
+                                price: oi.price,
+                                image: oi.menu_item?.image,
+                                description: oi.menu_item?.description,
+                                category: "Unknown",
+                                available: true
+                            }
+                        })),
+                        // Attempt to attach store name if possible, or fallback
+                        // Note: Our Order type doesn't have storeName, but we use it in UI.
+                        // We might need to extend Order type or just use local variable for display
+                    };
+                    // Hack: attach store name to valid display
+                    (mappedOrder as any).storeName = data.store?.name;
+                    mappedOrder.store_id = data.store_id; // Pass store_id for navigation
+                    setOrder(mappedOrder);
+                }
+            } catch (err: any) {
+                console.error("Error fetching order:", err);
+                setError("ไม่พบคำสั่งซื้อ หรือเกิดข้อผิดพลาด");
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOrder();
+    }, [orderId]);
+
+    if (loading) {
+        return (
+            <div className="min-h-screen flex items-center justify-center p-8 text-[var(--color-coffee-600)]">
+                กำลังโหลด...
+            </div>
+        );
+    }
+
+    if (!order || error) {
         return (
             <div className="min-h-screen flex flex-col items-center justify-center p-8 text-center space-y-4">
-                <p>No recent order found.</p>
-                <Link href="/menu"><Button>Back to Menu</Button></Link>
+                <p className="text-red-500">{error || "ไม่พบรหัสคำสั่งซื้อ"}</p>
+                <Link href="/"><Button>กลับไปที่เมนู</Button></Link>
             </div>
         );
     }
@@ -39,16 +109,13 @@ export default function ReceiptPage() {
 
                 <div className="p-8 pt-12 text-center space-y-6">
                     <div className="space-y-1 flex flex-col items-center">
-                        {user?.storeImage && (
-                            <img src={user.storeImage} alt="Store Logo" className="w-16 h-16 rounded-full object-cover border border-[var(--color-coffee-200)] mb-2" />
-                        )}
-                        <h2 className="text-2xl font-bold text-[var(--color-coffee-900)]">{user?.storeName || "Cafe"}</h2>
-                        <p className="text-sm text-[var(--color-coffee-500)]">Order #{latestOrder.orderId}</p>
-                        <p className="text-xs text-[var(--color-coffee-400)]">{latestOrder.timestamp.toLocaleString()}</p>
+                        <h2 className="text-2xl font-bold text-[var(--color-coffee-900)]">{(order as any).storeName || "Cafe"}</h2>
+                        <p className="text-sm text-[var(--color-coffee-500)]">ออเดอร์ #{order.orderId}</p>
+                        <p className="text-xs text-[var(--color-coffee-400)]">{order.timestamp.toLocaleString('th-TH')}</p>
                     </div>
 
                     <div className="border-t border-b border-dashed border-[var(--color-coffee-200)] py-4 space-y-2">
-                        {latestOrder.items.map((item, idx) => (
+                        {order.items.map((item, idx) => (
                             <div key={idx} className="flex justify-between text-sm">
                                 <div className="text-left">
                                     <span className="text-[var(--color-coffee-800)] font-bold">{item.menuItem.name}</span>
@@ -62,16 +129,21 @@ export default function ReceiptPage() {
                     </div>
 
                     <div className="flex justify-between font-bold text-lg text-[var(--color-coffee-900)]">
-                        <span>Total</span>
-                        <span>฿{latestOrder.totalAmount}</span>
+                        <span>ยอดรวม</span>
+                        <span>฿{order.totalAmount}</span>
                     </div>
 
                     <div className="pt-4">
                         <div className="w-32 h-32 bg-[var(--color-coffee-100)] mx-auto rounded-lg flex items-center justify-center text-xs text-[var(--color-coffee-500)] mb-2">
-                            [Mock QR Code]
+                            {/* Static or generic QR for customer share if needed, but this is the receipt itself */}
+                            <div className="flex items-center justify-center w-full h-full text-4xl text-[var(--color-coffee-300)]">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12l2 2 4-4m6 2a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                            </div>
                         </div>
-                        <p className="text-sm font-bold text-[var(--color-coffee-800)]">Thank you, {latestOrder.customerName}!</p>
-                        <p className="text-xs text-[var(--color-coffee-500)]">Please wait for your queue.</p>
+                        <p className="text-sm font-bold text-[var(--color-coffee-800)]">ขอบคุณค่ะ, {order.customerName}!</p>
+                        <p className="text-xs text-[var(--color-coffee-500)]">กรุณารอเรียกคิวสักครู่</p>
                     </div>
                 </div>
 
@@ -80,8 +152,8 @@ export default function ReceiptPage() {
             </div>
 
             <div className="mt-8">
-                <Link href="/">
-                    <Button variant="ghost">Back to Home</Button>
+                <Link href={order?.store_id ? `/menu?storeId=${order.store_id}` : "/menu"}>
+                    <Button variant="ghost">กลับสู่หน้าหลัก</Button>
                 </Link>
             </div>
         </div>

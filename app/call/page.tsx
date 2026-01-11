@@ -26,7 +26,7 @@ export default function CallPage() {
                 </div>
 
                 <div className="z-10 w-full max-w-4xl space-y-12">
-                    <h1 className="text-[var(--color-coffee-200)] text-3xl font-light uppercase tracking-[0.2em]">Now Serving</h1>
+                    <h1 className="text-[var(--color-coffee-200)] text-3xl font-light uppercase tracking-[0.2em]">กำลังให้บริการ</h1>
 
                     {currentCalling ? (
                         <div className="animate-in zoom-in duration-500">
@@ -34,19 +34,19 @@ export default function CallPage() {
                                 {currentCalling}
                             </div>
                             <div className="text-[var(--color-primary)] text-4xl font-medium animate-pulse">
-                                Your order is ready!
+                                ออเดอร์ของคุณพร้อมแล้ว!
                             </div>
                         </div>
                     ) : (
                         <div className="text-[var(--color-coffee-400)] text-6xl font-thin italic">
-                            Waiting for orders...
+                            รอเรียกคิว...
                         </div>
                     )}
 
                     {/* History */}
                     {history.length > 0 && (
                         <div className="mt-20 pt-10 border-t border-white/10">
-                            <h3 className="text-[var(--color-coffee-300)] text-xl mb-6 uppercase tracking-widest">Previously Called</h3>
+                            <h3 className="text-[var(--color-coffee-300)] text-xl mb-6 uppercase tracking-widest">เรียกคิวไปแล้วก่อนหน้า</h3>
                             <div className="flex flex-wrap justify-center gap-4">
                                 {history.map((name, i) => (
                                     <span key={i} className="px-6 py-3 bg-white/5 rounded-full text-white/60 text-xl backdrop-blur-sm">

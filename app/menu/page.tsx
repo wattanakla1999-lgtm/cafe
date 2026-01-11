@@ -9,8 +9,19 @@ import Link from "next/link";
 import { MenuItem, Option } from "../../data/mock";
 import { useMenu } from "../../context/MenuContext";
 
+import { useSearchParams } from "next/navigation";
+
 export default function MenuPage() {
-    const { menuItems, categories: contextCategories } = useMenu();
+    const { menuItems, categories: contextCategories, setPublicStoreId } = useMenu();
+    const searchParams = useSearchParams();
+    const storeId = searchParams.get("storeId");
+
+    // Capture storeId from URL and update context
+    React.useEffect(() => {
+        if (storeId) {
+            setPublicStoreId(storeId);
+        }
+    }, [storeId, setPublicStoreId]);
 
     // Categories for filter (Dynamic + "All")
     const categories = useMemo(() => ["All", ...contextCategories], [contextCategories]);
@@ -41,7 +52,15 @@ export default function MenuPage() {
         <div className="min-h-screen bg-[var(--color-background)] pb-24">
             {/* Header */}
             <div className="sticky top-0 z-10 bg-white/80 backdrop-blur-md border-b border-[var(--color-coffee-100)] p-4">
-                <h1 className="text-xl font-bold text-center text-[var(--color-primary)]">Menu</h1>
+                <div className="flex justify-between items-center">
+                    <div className="w-8"></div> {/* Spacer */}
+                    <h1 className="text-xl font-bold text-center text-[var(--color-primary)]">เมนู</h1>
+                    <Link href="/history" className="w-8 h-8 flex items-center justify-center text-[var(--color-coffee-600)] hover:text-[var(--color-primary)]">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4l3 3m6-3a9 9 0 11-18 0 9 9 0 0118 0z" />
+                        </svg>
+                    </Link>
+                </div>
             </div>
 
             {/* Category Tabs */}
@@ -55,7 +74,7 @@ export default function MenuPage() {
                             : "bg-white text-[var(--color-coffee-600)] border border-[var(--color-coffee-100)]"
                             }`}
                     >
-                        {cat}
+                        {cat === "All" ? "ทั้งหมด" : cat}
                     </button>
                 ))}
             </div>
@@ -76,8 +95,8 @@ export default function MenuPage() {
                 <div className="fixed bottom-6 left-4 right-4 z-40 animate-in slide-in-from-bottom duration-300">
                     <Link href="/cart">
                         <Button fullWidth size="lg" className="shadow-xl flex justify-between px-6">
-                            <span>{cart.length} Items</span>
-                            <span className="bg-white/20 px-2 py-0.5 rounded text-sm">View Cart</span>
+                            <span>{cart.length} รายการ</span>
+                            <span className="bg-white/20 px-2 py-0.5 rounded text-sm">ดูตะกร้า</span>
                             <span>฿{cart.reduce((sum, i) => sum + i.totalPrice, 0)}</span>
                         </Button>
                     </Link>

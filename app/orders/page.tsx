@@ -13,13 +13,13 @@ export default function OrdersPage() {
         <ProtectedRoute>
             <div className="min-h-screen bg-[var(--color-bg)] p-6">
                 <div className="flex justify-between items-center mb-8">
-                    <h1 className="text-3xl font-bold text-[var(--color-primary)]">Order Queue</h1>
+                    <h1 className="text-3xl font-bold text-[var(--color-primary)]">คิวออเดอร์ (ครัว)</h1>
                     <div className="space-x-4">
                         <Link href="/call" target="_blank">
-                            <Button variant="outline">Open Customer Display</Button>
+                            <Button variant="outline">เปิดหน้าจอเรียกคิว</Button>
                         </Link>
                         <Link href="/">
-                            <Button variant="ghost">Home</Button>
+                            <Button variant="ghost">หน้าหลัก</Button>
                         </Link>
                     </div>
                 </div>
@@ -27,7 +27,7 @@ export default function OrdersPage() {
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
                     {orders.length === 0 ? (
                         <div className="col-span-full text-center py-20 text-[var(--color-coffee-400)]">
-                            <p className="text-xl">No active orders</p>
+                            <p className="text-xl">ไม่มีออเดอร์ที่กำลังดำเนินการ</p>
                         </div>
                     ) : (
                         orders.map((order) => (
@@ -36,7 +36,7 @@ export default function OrdersPage() {
                                 <div className={`p-4 flex justify-between items-start ${order.channel === 'Counter' ? 'bg-[var(--color-secondary)]' : 'bg-[var(--color-primary)] text-white'}`}>
                                     <div>
                                         <h3 className="font-bold text-lg">{order.customerName}</h3>
-                                        <span className="text-xs opacity-80 uppercase tracking-wider">{order.channel} Order</span>
+                                        <span className="text-xs opacity-80 uppercase tracking-wider">{order.channel === 'Counter' ? 'หน้าร้าน' : order.channel}</span>
                                     </div>
                                     <span className="font-mono font-bold text-xl">#{order.orderId}</span>
                                 </div>
@@ -62,7 +62,7 @@ export default function OrdersPage() {
                                         onClick={() => callOrder(order.customerName)}
                                         className="shadow-sm"
                                     >
-                                        Call Customer
+                                        เรียกคิวลูกค้า
                                     </Button>
                                 </div>
                             </div>

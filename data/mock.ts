@@ -15,6 +15,8 @@ export interface MenuItem {
     image?: string; // Placeholder for now
     available: boolean;
     allowedToppings?: string[]; // IDs of allowed toppings
+    allowTypeSelection?: boolean; // Hot/Iced/Frappe
+    allowBeanSelection?: boolean; // Dark/Medium/Light Roast
 }
 
 export const MENU_ITEMS: MenuItem[] = [
@@ -36,10 +38,22 @@ export const MENU_ITEMS: MenuItem[] = [
 ];
 
 export const SWEETNESS_LEVELS: Option[] = [
-    { id: "sw0", name: "0% (No Sugar)", price: 0 },
-    { id: "sw25", name: "25% (Less Sweet)", price: 0 },
-    { id: "sw50", name: "50% (Half Sweet)", price: 0 },
-    { id: "sw100", name: "100% (Normal)", price: 0 },
+    { id: "sw0", name: "0% (ไม่หวาน)", price: 0 },
+    { id: "sw25", name: "25% (หวานน้อย)", price: 0 },
+    { id: "sw50", name: "50% (หวานปกติ)", price: 0 },
+    { id: "sw100", name: "100% (หวานมาก)", price: 0 },
+];
+
+export const SERVING_TYPES: Option[] = [
+    { id: "hot", name: "ร้อน", price: 0 },
+    { id: "iced", name: "เย็น", price: 5 },
+    { id: "frappe", name: "ปั่น", price: 10 },
+];
+
+export const COFFEE_BEANS: Option[] = [
+    { id: "dark", name: "คั่วเข้ม", price: 0 },
+    { id: "medium", name: "คั่วกลาง", price: 0 },
+    { id: "light", name: "คั่วอ่อน", price: 0 },
 ];
 
 

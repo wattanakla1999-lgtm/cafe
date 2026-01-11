@@ -35,7 +35,7 @@ export function SalesCharts({ salesTrend, categoryDistribution, range }: SalesCh
             {/* Sales Trend Chart */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-[var(--color-coffee-100)]">
                 <h3 className="text-lg font-bold text-[var(--color-coffee-900)] mb-4">
-                    Sales Trend ({isToday ? "Hourly" : "Daily"})
+                    แนวโน้มยอดขาย ({isToday ? "รายชั่วโมง" : "รายวัน"})
                 </h3>
                 <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -56,7 +56,7 @@ export function SalesCharts({ salesTrend, categoryDistribution, range }: SalesCh
                             />
                             <Tooltip
                                 contentStyle={{ borderRadius: "8px", border: "none", boxShadow: "0 4px 6px -1px rgb(0 0 0 / 0.1)" }}
-                                formatter={(value: any) => [`฿${value.toLocaleString()}`, "Sales"]}
+                                formatter={(value: any) => [`฿${value.toLocaleString()}`, "ยอดขาย"]}
                             />
                             <Line
                                 type="monotone"
@@ -74,7 +74,7 @@ export function SalesCharts({ salesTrend, categoryDistribution, range }: SalesCh
             {/* Category Distribution / Comparison */}
             <div className="bg-white p-6 rounded-2xl shadow-sm border border-[var(--color-coffee-100)]">
                 <h3 className="text-lg font-bold text-[var(--color-coffee-900)] mb-4">
-                    Sales by Category
+                    ยอดขายตามหมวดหมู่
                 </h3>
                 <div className="h-64 w-full">
                     <ResponsiveContainer width="100%" height="100%">
@@ -92,7 +92,7 @@ export function SalesCharts({ salesTrend, categoryDistribution, range }: SalesCh
                                     <Cell key={`cell-${index}`} fill={COLORS[index % COLORS.length]} />
                                 ))}
                             </Pie>
-                            <Tooltip formatter={(value: any) => [`฿${value.toLocaleString()}`, "Revenue"]} />
+                            <Tooltip formatter={(value: any) => [`฿${value.toLocaleString()}`, "รายรับ"]} />
                             <Legend verticalAlign="bottom" height={36} />
                         </PieChart>
                     </ResponsiveContainer>

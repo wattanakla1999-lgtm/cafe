@@ -1,18 +1,17 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState } from "react";
 import { useAuth } from "../../context/AuthContext";
 import { Button } from "../../components/Button";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
+import { passwordSchema, sanitizeInput } from "../../lib/security";
 
 export default function RegisterPage() {
     const { register } = useAuth();
     const router = useRouter();
 
     const [storeName, setStoreName] = useState("");
-    const [storeImage, setStoreImage] = useState<string | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
     const [password, setPassword] = useState("");
@@ -20,34 +19,35 @@ export default function RegisterPage() {
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const file = e.target.files?.[0];
-        if (file) {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setStoreImage(reader.result as string);
-            };
-            reader.readAsDataURL(file);
-        }
-    };
-
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
         setError("");
 
+        // Security: Validate password strength
+        try {
+            passwordSchema.parse(password);
+        } catch (err: any) {
+            setError(err.errors[0].message);
+            return;
+        }
+
         if (password !== confirmPassword) {
-            setError("Passwords do not match");
+            setError("รหัสผ่านไม่ตรงกัน");
             return;
         }
 
         setIsLoading(true);
 
         try {
-            const success = await register(storeName, name, email, password, storeImage || undefined);
-            if (success) {
+            // Security: Sanitize inputs
+            const safeStoreName = sanitizeInput(storeName);
+            const safeName = sanitizeInput(name);
+
+            const result = await register(safeStoreName, safeName, email, password);
+            if (result.success) {
                 router.push("/");
             } else {
-                setError("Registration failed");
+                setError(result.error || "Registration failed");
             }
         } catch (err) {
             setError("Something went wrong");
@@ -60,8 +60,8 @@ export default function RegisterPage() {
         <div className="min-h-screen flex items-center justify-center bg-[var(--color-bg)] p-4 py-8">
             <div className="w-full max-w-md bg-white rounded-2xl shadow-xl p-8 animate-scale-up">
                 <div className="text-center mb-8">
-                    <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">Create Account</h1>
-                    <p className="text-[var(--color-coffee-500)]">Start managing your store today</p>
+                    <h1 className="text-3xl font-bold text-[var(--color-primary)] mb-2">สร้างบัญชี</h1>
+                    <p className="text-[var(--color-coffee-500)]">เริ่มจัดการร้านค้าของคุณได้วันนี้</p>
                 </div>
 
                 {error && (
@@ -71,60 +71,32 @@ export default function RegisterPage() {
                 )}
 
                 <form onSubmit={handleRegister} className="space-y-5">
-                    {/* Store Image Upload */}
-                    <div className="flex flex-col items-center gap-4">
-                        <div
-                            className="w-24 h-24 rounded-full bg-[var(--color-coffee-50)] border-2 border-dashed border-[var(--color-coffee-200)] flex items-center justify-center overflow-hidden cursor-pointer hover:border-[var(--color-primary)] transition-colors relative group"
-                            onClick={() => fileInputRef.current?.click()}
-                        >
-                            {storeImage ? (
-                                <img src={storeImage} alt="Store Logo" className="w-full h-full object-cover" />
-                            ) : (
-                                <div className="text-center text-[var(--color-coffee-400)]">
-                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-8 w-8 mx-auto mb-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={1} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                    </svg>
-                                    <span className="text-[10px] font-bold">Upload Logo</span>
-                                </div>
-                            )}
-                            <div className="absolute inset-0 bg-black/30 flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity">
-                                <span className="text-white text-xs font-bold">Change</span>
-                            </div>
-                        </div>
-                        <input
-                            type="file"
-                            ref={fileInputRef}
-                            onChange={handleFileChange}
-                            className="hidden"
-                            accept="image/*"
-                        />
-                    </div>
                     <div>
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Store Name</label>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อร้านค้า</label>
                         <input
                             type="text"
                             required
                             value={storeName}
                             onChange={(e) => setStoreName(e.target.value)}
                             className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
-                            placeholder="e.g. My Cool Cafe"
+                            placeholder="เช่น คาเฟ่แสนสุข"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Owner Name</label>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ชื่อเจ้าของร้าน</label>
                         <input
                             type="text"
                             required
                             value={name}
                             onChange={(e) => setName(e.target.value)}
                             className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
-                            placeholder="John Doe"
+                            placeholder="สมชาย ใจดี"
                         />
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Email</label>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">อีเมล</label>
                         <input
                             type="email"
                             required
@@ -137,7 +109,7 @@ export default function RegisterPage() {
 
                     <div className="grid grid-cols-2 gap-4">
                         <div>
-                            <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Password</label>
+                            <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">รหัสผ่าน</label>
                             <input
                                 type="password"
                                 required
@@ -148,7 +120,7 @@ export default function RegisterPage() {
                             />
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">Confirm</label>
+                            <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ยืนยันรหัสผ่าน</label>
                             <input
                                 type="password"
                                 required
@@ -160,6 +132,32 @@ export default function RegisterPage() {
                         </div>
                     </div>
 
+                    <div className="text-xs text-[var(--color-coffee-500)] space-y-1 bg-[var(--color-coffee-50)] p-3 rounded-lg border border-[var(--color-coffee-100)]">
+                        <p className="font-bold mb-1">รหัสผ่านต้องประกอบด้วย:</p>
+                        <ul className="grid grid-cols-2 gap-x-2 gap-y-1">
+                            <li className={`flex items-center gap-1.5 ${password.length >= 8 ? 'text-green-600 font-medium' : ''}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${password.length >= 8 ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                8 ตัวอักษรขึ้นไป
+                            </li>
+                            <li className={`flex items-center gap-1.5 ${/[A-Z]/.test(password) ? 'text-green-600 font-medium' : ''}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${/[A-Z]/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                ตัวพิมพ์ใหญ่ (A-Z)
+                            </li>
+                            <li className={`flex items-center gap-1.5 ${/[a-z]/.test(password) ? 'text-green-600 font-medium' : ''}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${/[a-z]/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                ตัวพิมพ์เล็ก (a-z)
+                            </li>
+                            <li className={`flex items-center gap-1.5 ${/[0-9]/.test(password) ? 'text-green-600 font-medium' : ''}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${/[0-9]/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                ตัวเลข (0-9)
+                            </li>
+                            <li className={`flex items-center gap-1.5 ${/[^A-Za-z0-9]/.test(password) ? 'text-green-600 font-medium' : ''}`}>
+                                <span className={`w-1.5 h-1.5 rounded-full ${/[^A-Za-z0-9]/.test(password) ? 'bg-green-500' : 'bg-gray-300'}`}></span>
+                                อักขระพิเศษ (!@#$%)
+                            </li>
+                        </ul>
+                    </div>
+
                     <Button
                         type="submit"
                         fullWidth
@@ -167,14 +165,14 @@ export default function RegisterPage() {
                         className="shadow-lg shadow-orange-200 mt-2"
                         disabled={isLoading}
                     >
-                        {isLoading ? "Creating Store..." : "Register Store"}
+                        {isLoading ? "กำลังสร้างร้านค้า..." : "ลงทะเบียนร้านค้า"}
                     </Button>
                 </form>
 
                 <div className="mt-8 text-center text-sm text-[var(--color-coffee-600)]">
-                    Already have a store?{" "}
+                    มีร้านค้าอยู่แล้ว?{" "}
                     <Link href="/login" className="font-bold text-[var(--color-primary)] hover:underline">
-                        Sign In
+                        เข้าสู่ระบบ
                     </Link>
                 </div>
             </div>

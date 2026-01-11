@@ -21,6 +21,7 @@ export function Combobox({
 }: ComboboxProps) {
     const [isOpen, setIsOpen] = useState(false);
     const [search, setSearch] = useState(value);
+    const [isFiltering, setIsFiltering] = useState(false);
     const containerRef = useRef<HTMLDivElement>(null);
 
     // Sync internal search state with external value prop
@@ -33,31 +34,37 @@ export function Combobox({
         function handleClickOutside(event: MouseEvent) {
             if (containerRef.current && !containerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
-                // On close, ensure value matches what was typed if it's strictly free solo, 
-                // but we are already updating on change, so this is fine.
-                // If we wanted to revert to last valid value on blur if invalid, we'd do it here.
-                // For "add new category" logic, keeping text is correct.
+                setIsFiltering(false); // Reset filtering state
             }
         }
         document.addEventListener("mousedown", handleClickOutside);
         return () => document.removeEventListener("mousedown", handleClickOutside);
     }, []);
 
-    const filteredOptions = options.filter(option =>
-        option.toLowerCase().includes(search.toLowerCase())
-    );
+    const filteredOptions = isFiltering
+        ? options.filter(option => option.toLowerCase().includes(search.toLowerCase()))
+        : options;
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const newValue = e.target.value;
         setSearch(newValue);
         onChange(newValue);
         setIsOpen(true);
+        setIsFiltering(true);
     };
 
     const handleSelectOption = (option: string) => {
         setSearch(option);
         onChange(option);
         setIsOpen(false);
+        setIsFiltering(false);
+    };
+
+    const toggleOpen = () => {
+        setIsOpen(!isOpen);
+        // If opening via toggle, reset filtering to show all options. 
+        // If closing, nice to reset too.
+        setIsFiltering(false);
     };
 
     return (
@@ -73,7 +80,13 @@ export function Combobox({
                     type="text"
                     value={search}
                     onChange={handleInputChange}
-                    onFocus={() => setIsOpen(true)}
+                    onFocus={() => {
+                        setIsOpen(true);
+                        // On focus, usually we keep previous state, but if we want to filter immediately by existing value:
+                        // setIsFiltering(true); 
+                        // But better UX might be to show all until they type? 
+                        // Let's stick to: focus = open. Only typing = filtering.
+                    }}
                     placeholder={placeholder}
                     className="w-full p-2.5 pr-10 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all shadow-sm"
                     required={required}
@@ -82,7 +95,7 @@ export function Combobox({
                 {/* Chevron / Toggle Button */}
                 <button
                     type="button"
-                    onClick={() => setIsOpen(!isOpen)}
+                    onClick={toggleOpen}
                     className="absolute right-0 top-0 bottom-0 px-3 text-[var(--color-coffee-400)] hover:text-[var(--color-primary)] transition-colors cursor-pointer flex items-center justify-center"
                 >
                     <svg
@@ -117,7 +130,7 @@ export function Combobox({
                         ))
                     ) : (
                         <div className="px-4 py-3 text-sm text-[var(--color-coffee-400)] italic text-center">
-                            Press Enter to add "{search}"
+                            กด Enter เพื่อเพิ่ม "{search}"
                         </div>
                     )}
                 </div>

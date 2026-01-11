@@ -9,13 +9,14 @@ import { Button } from "../../../components/Button";
 import { AdminMenuItemCard } from "../../../components/AdminMenuItemCard";
 import { MenuFormModal } from "../../../components/MenuFormModal";
 import { CategoryManagerModal } from "../../../components/CategoryManagerModal";
+import { ServingTypeManagerModal } from "../../../components/ServingTypeManagerModal";
 import { DiscountManagerModal } from "../../../components/DiscountManagerModal";
 import { ToppingManagerModal } from "../../../components/ToppingManagerModal";
 import { StoreSettingsModal } from "../../../components/StoreSettingsModal";
 import { ProtectedRoute } from "../../../components/ProtectedRoute";
 
 function MenuContent() {
-    const { menuItems, categories: contextCategories, addMenuItem, updateMenuItem, deleteMenuItem } = useMenu();
+    const { menuItems, categories: contextCategories, addMenuItem, updateMenuItem, deleteMenuItem, isLoading } = useMenu();
     const searchParams = useSearchParams();
 
     // UI State
@@ -27,6 +28,7 @@ function MenuContent() {
     const [isManagerOpen, setIsManagerOpen] = useState(false);
     const [isDiscountManagerOpen, setIsDiscountManagerOpen] = useState(false);
     const [isToppingManagerOpen, setIsToppingManagerOpen] = useState(false);
+    const [isServingTypeManagerOpen, setIsServingTypeManagerOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
 
@@ -81,7 +83,17 @@ function MenuContent() {
 
     return (
         <ProtectedRoute>
-            <div className="min-h-screen bg-[var(--color-bg)] flex flex-col">
+            <div className="min-h-screen bg-[var(--color-bg)] flex flex-col relative">
+                {/* Global Loading Overlay */}
+                {isLoading && (
+                    <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/20 backdrop-blur-sm animate-in fade-in duration-200">
+                        <div className="bg-white p-6 rounded-2xl shadow-xl flex flex-col items-center gap-3 animate-in zoom-in-95 duration-200">
+                            <div className="w-10 h-10 border-4 border-[var(--color-primary)] border-t-transparent rounded-full animate-spin"></div>
+                            <span className="text-[var(--color-coffee-800)] font-bold">Processing...</span>
+                        </div>
+                    </div>
+                )}
+
                 {/* Header */}
                 <header className="bg-white px-6 py-4 shadow-sm border-b border-[var(--color-coffee-200)] flex justify-between items-center sticky top-0 z-10">
                     <div className="flex items-center gap-4">
@@ -92,11 +104,11 @@ function MenuContent() {
                                 </svg>
                             </Button>
                         </Link>
-                        <h1 className="text-xl font-bold text-[var(--color-coffee-900)]">Manager</h1>
+                        <h1 className="text-xl font-bold text-[var(--color-coffee-900)]">จัดการเมนู</h1>
                     </div>
 
                     <div className="flex gap-2">
-                        <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2" title="Store Settings">
+                        <Button variant="outline" onClick={() => setIsSettingsOpen(true)} className="flex items-center gap-2" title="ตั้งค่าร้านค้า">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M11.49 3.17c-.38-1.56-2.6-1.56-2.98 0a1.532 1.532 0 01-2.286.948c-1.372-.836-2.942.734-2.106 2.106.54.886.061 2.042-.947 2.287-1.561.379-1.561 2.6 0 2.978a1.532 1.532 0 01.947 2.287c-.836 1.372.734 2.942 2.106 2.106a1.532 1.532 0 012.287.947c.379 1.561 2.6 1.561 2.978 0a1.533 1.533 0 012.287-.947c1.372.836 2.942-.734 2.106-2.106a1.533 1.533 0 01.947-2.287c1.561-.379 1.561-2.6 0-2.978a1.532 1.532 0 01-.947-2.287c.836-1.372-.734-2.942-2.106-2.106a1.532 1.532 0 01-2.287-.947zM10 13a3 3 0 100-6 3 3 0 000 6z" clipRule="evenodd" />
                             </svg>
@@ -105,25 +117,31 @@ function MenuContent() {
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 2a1 1 0 011 1v1a1 1 0 11-2 0V3a1 1 0 011-1zm4 8a4 4 0 11-8 0 4 4 0 018 0zm-.464 4.95l.707.707a1 1 0 001.414-1.414l-.707-.707a1 1 0 00-1.414 1.414zm2.12-10.607a1 1 0 010 1.414l-.706.707a1 1 0 11-1.414-1.414l.707-.707a1 1 0 011.414 0zM17 11a1 1 0 100-2h-1a1 1 0 100 2h1zm-7 4a1 1 0 011 1v1a1 1 0 11-2 0v-1a1 1 0 011-1zM5.05 6.464A1 1 0 106.465 5.05l-.708-.707a1 1 0 00-1.414 1.414l.707.707zm1.414 8.486l-.707.707a1 1 0 01-1.414-1.414l.707-.707a1 1 0 011.414 1.414zM4 11a1 1 0 100-2H3a1 1 0 000 2h1z" clipRule="evenodd" />
                             </svg>
-                            <span className="hidden sm:inline">Discounts</span>
+                            <span className="hidden sm:inline">ส่วนลด</span>
                         </Button>
                         <Button variant="outline" onClick={() => setIsManagerOpen(true)} className="flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M5 3a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2V5a2 2 0 00-2-2H5zM5 11a2 2 0 00-2 2v2a2 2 0 002 2h2a2 2 0 002-2v-2a2 2 0 00-2-2H5zM11 5a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2V5zM11 13a2 2 0 012-2h2a2 2 0 012 2v2a2 2 0 01-2 2h-2a2 2 0 01-2-2v-2z" />
                             </svg>
-                            <span>Categories</span>
+                            <span>หมวดหมู่</span>
                         </Button>
                         <Button variant="outline" onClick={() => setIsToppingManagerOpen(true)} className="flex items-center gap-2">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
                             </svg>
-                            <span className="hidden sm:inline">Toppings</span>
+                            <span className="hidden sm:inline">ท็อปปิ้ง</span>
+                        </Button>
+                        <Button variant="outline" onClick={() => setIsServingTypeManagerOpen(true)} className="flex items-center gap-2">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-11a1 1 0 10-2 0v2H7a1 1 0 100 2h2v2a1 1 0 102 0v-2h2a1 1 0 100-2h-2V7z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">รูปแบบ</span>
                         </Button>
                         <Button variant="primary" onClick={handleAddNew} className="flex items-center gap-2 shadow-lg shadow-orange-100">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
                             </svg>
-                            <span className="hidden sm:inline">Add Item</span>
+                            <span className="hidden sm:inline">เพิ่มเมนู</span>
                         </Button>
                     </div>
                 </header>
@@ -141,7 +159,7 @@ function MenuContent() {
                             </span>
                             <input
                                 type="text"
-                                placeholder="Search menu items..."
+                                placeholder="ค้นหาเมนู..."
                                 value={searchQuery}
                                 onChange={(e) => setSearchQuery(e.target.value)}
                                 className="w-full pl-10 pr-4 py-2 border border-[var(--color-coffee-200)] rounded-full focus:ring-2 focus:ring-[var(--color-primary)] focus:border-transparent outline-none bg-white shadow-sm transition-shadow"
@@ -160,7 +178,7 @@ function MenuContent() {
                                     : "bg-white text-[var(--color-coffee-600)] border border-[var(--color-coffee-200)] hover:bg-[var(--color-coffee-50)]"
                                     }`}
                             >
-                                {cat}
+                                {cat === "All" ? "ทั้งหมด" : cat}
                             </button>
                         ))}
                     </div>
@@ -187,7 +205,7 @@ function MenuContent() {
                                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
                                 </svg>
                             </div>
-                            <span className="font-bold">Add New Item</span>
+                            <span className="font-bold">เพิ่มเมนูใหม่</span>
                         </div>
                     </div>
                 </main>
@@ -213,6 +231,11 @@ function MenuContent() {
                 <ToppingManagerModal
                     isOpen={isToppingManagerOpen}
                     onClose={() => setIsToppingManagerOpen(false)}
+                />
+
+                <ServingTypeManagerModal
+                    isOpen={isServingTypeManagerOpen}
+                    onClose={() => setIsServingTypeManagerOpen(false)}
                 />
 
                 <StoreSettingsModal
