@@ -38,7 +38,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const profileFetchPromiseRef = React.useRef<Promise<any> | null>(null);
 
     // Fetch user profile (store info) using direct fetch to bypass Supabase client state issues
-    const loadStoreProfile = async (authUser: SupabaseUser, retryCount = 0): Promise<User | null> => {
+    const loadStoreProfile = async (authUser: SupabaseUser, accessToken?: string, retryCount = 0): Promise<User | null> => {
         try {
             console.log(`Loading store profile (Attempt ${retryCount + 1})...`);
 
@@ -80,7 +80,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 if (retryCount < 3) {
                     console.warn(`Store not found for user ${authUser.id}, retrying in 1.5s... (${retryCount + 1}/3)`);
                     await new Promise(resolve => setTimeout(resolve, 1500));
-                    return loadStoreProfile(authUser, retryCount + 1);
+                    return loadStoreProfile(authUser, accessToken, retryCount + 1);
                 }
                 console.error("Store not found after 3 retries");
                 return null;
@@ -110,7 +110,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 const { data: { session } } = await supabase.auth.getSession();
 
                 if (mounted && session?.user) {
-                    const profile = await loadStoreProfile(session.user);
+                    const profile = await loadStoreProfile(session.user, session.access_token);
                     if (mounted) setUser(profile);
                 }
             } catch (error: any) {
@@ -136,7 +136,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 // Only load if user changed or we don't have one
                 if (!currentUser || currentUser.id !== session.user.id) {
                     try {
-                        const profile = await loadStoreProfile(session.user);
+                        const profile = await loadStoreProfile(session.user, session.access_token);
                         if (mounted) setUser(profile);
                     } catch (e: any) {
                         // Silently handle AbortError in auth state change
