@@ -50,14 +50,18 @@ export default function Home() {
             </Button>
           </div>
 
+
+
           {!user ? (
             /* ... Guest View ... */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
+
               <Link href="/login">
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
                   เข้าสู่ระบบร้านค้า
                 </Button>
               </Link>
+              <div>user{user}</div>
               <Link href="/register">
                 <Button fullWidth variant="ghost">
                   สร้างร้านค้าใหม่
@@ -65,6 +69,8 @@ export default function Home() {
               </Link>
             </div>
           ) : (
+
+
             /* Logged In / Store View */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
               <Link href="/counter">

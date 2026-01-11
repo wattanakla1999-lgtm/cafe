@@ -70,55 +70,89 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     // Fetch Orders from Supabase
     useEffect(() => {
+        let mounted = true;
         if (!user?.storeId) return;
 
-        const fetchOrders = async () => {
-            const { data, error } = await supabase
-                .from("orders")
-                .select(`
-                    *,
-                    order_items (
-                        *,
-                        menu_item:menu_items (
-                            id, name, price, image, description, category_id
-                        )
-                    )
-                `)
-                .eq("store_id", user.storeId)
-                .order("created_at", { ascending: false }); // Newest first
+        const fetchOrders = async (retryCount = 0) => {
+            if (!mounted) return; // Stop if unmounted
 
-            if (error) {
-                console.error("Error fetching orders:", error);
-                return;
-            }
+            try {
+                // Use REST API directly to avoid Supabase client lock contention (AbortError)
+                const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
+                const anonKey = process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!;
 
-            if (data) {
-                const mappedOrders: Order[] = data.map((o: any) => ({
-                    id: o.id,
-                    orderId: o.id.substring(0, 6).toUpperCase(), // Mock short ID
-                    customerName: o.customer_name,
-                    totalAmount: o.total_amount,
-                    discount: o.discount_info,
-                    status: o.status,
-                    timestamp: new Date(o.created_at),
-                    channel: o.channel,
-                    items: o.order_items.map((oi: any) => ({
-                        itemId: oi.id,
-                        quantity: oi.quantity,
-                        totalPrice: oi.total_price,
-                        options: oi.options || [],
-                        menuItem: {
-                            id: oi.menu_item?.id || oi.menu_item_id,
-                            name: oi.name, // Use snapshot name
-                            price: oi.price,
-                            image: oi.menu_item?.image,
-                            description: oi.menu_item?.description,
-                            category: "Unknown", // we didn't join categories, fine for history
-                            available: true
-                        }
-                    }))
-                }));
-                setOrders(mappedOrders);
+                // Construct URL with query parameters for joining tables
+                // select=*,order_items(*,menu_item:menu_items(id,name,price,image,description,category_id))
+                const query = new URLSearchParams({
+                    select: '*,order_items(*,menu_item:menu_items(id,name,price,image,description,category_id))',
+                    store_id: `eq.${user.storeId}`,
+                    order: 'created_at.desc'
+                });
+
+                const response = await fetch(`${supabaseUrl}/rest/v1/orders?${query.toString()}`, {
+                    method: 'GET',
+                    headers: {
+                        'apikey': anonKey,
+                        'Authorization': `Bearer ${user.accessToken}`, // Use token from AuthContext
+                        'Content-Type': 'application/json'
+                    }
+                });
+
+                if (!mounted) return; // Stop if unmounted during fetch
+
+                if (!response.ok) {
+                    const errorText = await response.text();
+                    // Check for 5xx errors or specific fetch issues to retry
+                    if (retryCount < 3) {
+                        console.warn(`[Orders] ⚠️ Fetch error (Attempt ${retryCount + 1}), retrying...`, response.status, errorText);
+                        setTimeout(() => {
+                            if (mounted) fetchOrders(retryCount + 1);
+                        }, 1000 * (retryCount + 1));
+                        return;
+                    }
+                    console.error("Error fetching orders:", response.status, errorText);
+                    return;
+                }
+
+                const data = await response.json();
+
+                if (data) {
+                    const mappedOrders: Order[] = data.map((o: any) => ({
+                        id: o.id,
+                        orderId: o.id.substring(0, 6).toUpperCase(), // Mock short ID
+                        customerName: o.customer_name,
+                        totalAmount: o.total_amount,
+                        discount: o.discount_info,
+                        status: o.status,
+                        timestamp: new Date(o.created_at),
+                        channel: o.channel,
+                        items: o.order_items.map((oi: any) => ({
+                            itemId: oi.id,
+                            quantity: oi.quantity,
+                            totalPrice: oi.total_price,
+                            options: oi.options || [],
+                            menuItem: {
+                                id: oi.menu_item?.id || oi.menu_item_id,
+                                name: oi.name, // Use snapshot name
+                                price: oi.price,
+                                image: oi.menu_item?.image,
+                                description: oi.menu_item?.description,
+                                category: "Unknown", // we didn't join categories, fine for history
+                                available: true
+                            }
+                        }))
+                    }));
+                    if (mounted) setOrders(mappedOrders);
+                }
+            } catch (err: any) {
+                if (!mounted) return;
+                // Retry on network errors
+                if (retryCount < 3) {
+                    console.warn(`[Orders] ⚠️ Exception (Attempt ${retryCount + 1}), retrying...`, err);
+                    setTimeout(() => {
+                        if (mounted) fetchOrders(retryCount + 1);
+                    }, 1000 * (retryCount + 1));
+                }
             }
         };
 
@@ -157,6 +191,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             .subscribe();
 
         return () => {
+            mounted = false;
             supabase.removeChannel(channel);
         };
     }, [user?.storeId]);
