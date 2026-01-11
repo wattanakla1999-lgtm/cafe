@@ -34,47 +34,57 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     const userRef = React.useRef<User | null>(null);
     useEffect(() => { userRef.current = user; }, [user]);
 
+    // Keep track of ongoing profile fetches to prevent race conditions/double-fetching
+    const profileFetchPromiseRef = React.useRef<Promise<any> | null>(null);
+
     // Fetch user profile (store info)
     const loadStoreProfile = async (authUser: SupabaseUser) => {
-        try {
-            console.log("Loading store profile...");
-
-            // Create a timeout promise
-            const timeoutPromise = new Promise((_, reject) =>
-                setTimeout(() => reject(new Error("Request timed out")), 10000)
-            );
-
-            // Database query promise
-            const dbPromise = supabase
-                .from("stores")
-                .select("id, name")
-                .eq("user_id", authUser.id)
-                .maybeSingle();
-
-            // Race the query against the timeout
-            const { data: stores, error } = await Promise.race([dbPromise, timeoutPromise]) as any;
-
-            if (error) {
-                console.error("Store fetch error:", error);
-                // Return null but log the error. This will result in specific handling if needed.
-                return null;
-            }
-
-            // If no store found (stores is null)
-            if (!stores) return null;
-
-            return {
-                id: authUser.id,
-                email: authUser.email!,
-                storeName: stores.name,
-                storeId: stores.id
-            };
-        } catch (e) {
-            console.error("Profile fetch exception:", e);
-            // If it's a timeout, we might want to let the caller know, but returning null ensures safety for now.
-            // Ideally should throw so 'login' knows it was a network issue.
-            return null;
+        // Dedup: If a fetch is already running for this user, return the existing promise
+        if (profileFetchPromiseRef.current) {
+            return profileFetchPromiseRef.current;
         }
+
+        const fetchOp = async () => {
+            try {
+                console.log("Loading store profile...");
+
+                // Shortened timeout to 7s for better UX
+                const timeoutPromise = new Promise((_, reject) =>
+                    setTimeout(() => reject(new Error("Profile load timed out")), 7000)
+                );
+
+                const dbPromise = supabase
+                    .from("stores")
+                    .select("id, name")
+                    .eq("user_id", authUser.id)
+                    .maybeSingle();
+
+                const { data: stores, error } = await Promise.race([dbPromise, timeoutPromise]) as any;
+
+                if (error) {
+                    console.error("Store fetch error:", error);
+                    return null;
+                }
+
+                if (!stores) return null;
+
+                return {
+                    id: authUser.id,
+                    email: authUser.email!,
+                    storeName: stores.name,
+                    storeId: stores.id
+                };
+            } catch (e) {
+                console.error("Profile fetch exception:", e);
+                return null;
+            } finally {
+                // Clean up the lock
+                profileFetchPromiseRef.current = null;
+            }
+        };
+
+        profileFetchPromiseRef.current = fetchOp();
+        return profileFetchPromiseRef.current;
     };
 
     // Initialize session
@@ -102,10 +112,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             console.log("Auth State Change:", event, session?.user?.id);
 
             if (session?.user) {
-                // Check against ref to avoid stale closure
                 const currentUser = userRef.current;
-
-                // If we don't have a user, OR the auth user changed, fetch profile
+                // Only load if user changed or we don't have one
                 if (!currentUser || currentUser.id !== session.user.id) {
                     const profile = await loadStoreProfile(session.user);
                     if (mounted) setUser(profile);
@@ -126,33 +134,44 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     }, [router]);
 
     const login = async (email: string, password: string) => {
-        const { data, error } = await supabase.auth.signInWithPassword({
-            email: email.trim(),
-            password
-        });
+        try {
+            // Wrap login in a timeout too, in case Supabase client hangs
+            const loginPromise = supabase.auth.signInWithPassword({
+                email: email.trim(),
+                password
+            });
 
-        if (error) {
-            return { success: false, error: error.message };
-        }
+            const timeoutPromise = new Promise((_, reject) =>
+                setTimeout(() => reject(new Error("Login request timed out")), 10000)
+            );
 
-        // Verify that the user actually has a store profile
-        if (data.user) {
-            const profile = await loadStoreProfile(data.user);
+            const result = await Promise.race([loginPromise, timeoutPromise]) as any;
 
-            if (!profile) {
-                // Determine if it was a network error or missing store?
-                // For now, assume missing store to be safe, but we could improve this.
-                await supabase.auth.signOut();
-                return { success: false, error: "ไม่พบข้อมูลร้านค้า หรือการเชื่อมต่อขัดข้อง (Store not found or Connection failed)" };
+            // Handle Login Result
+            const { data, error } = result;
+
+            if (error) {
+                return { success: false, error: error.message };
             }
 
-            // OPTIMIZATION: Set user immediately! 
-            // This prevents the race condition where redirect happens before onAuthStateChange fires.
-            // onAuthStateChange has a check to avoid re-setting if IDs match.
-            setUser(profile);
-        }
+            // Verify that the user actually has a store profile
+            if (data?.user) {
+                const profile = await loadStoreProfile(data.user);
 
-        return { success: true };
+                if (!profile) {
+                    await supabase.auth.signOut();
+                    return { success: false, error: "ไม่พบข้อมูลร้านค้า หรือเครือข่ายมีปัญหา (Network/Store Error)" };
+                }
+
+                // Force update user immediately
+                setUser(profile);
+            }
+
+            return { success: true };
+        } catch (err) {
+            console.error("Login fatal error:", err);
+            return { success: false, error: "การเชื่อมต่อใช้เวลานานเกินไป กรุณาลองใหม่ (Timeout)" };
+        }
     };
 
     const register = async (storeName: string, name: string, email: string, password: string) => {
