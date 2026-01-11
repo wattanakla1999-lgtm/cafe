@@ -142,35 +142,31 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
     const login = async (email: string, password: string) => {
         try {
-            // Call Supabase directly without Promise.race timeout
-            // Supabase client handles its own internal timeouts
+            console.log("Login attempt for:", email.trim());
+
+            // Call Supabase directly
             const { data, error } = await supabase.auth.signInWithPassword({
                 email: email.trim(),
                 password
             });
+
+            console.log("Login response:", { data: !!data?.user, error: error?.message });
 
             if (error) {
                 console.error("Login Supabase error:", error.message);
                 return { success: false, error: error.message };
             }
 
-            // Verify that the user actually has a store profile
+            // Don't load store profile here - let onAuthStateChange handle it
+            // This avoids race conditions between login() and onAuthStateChange both calling loadStoreProfile
             if (data?.user) {
-                const profile = await loadStoreProfile(data.user);
-
-                if (!profile) {
-                    await supabase.auth.signOut();
-                    return { success: false, error: "ไม่พบข้อมูลร้านค้า กรุณาลองอีกครั้งหรือติดต่อผู้ดูแลระบบ" };
-                }
-
-                // Force update user immediately
-                setUser(profile);
+                console.log("Login successful, auth ID:", data.user.id);
+                // The onAuthStateChange callback will handle loading the profile
             }
 
             return { success: true };
         } catch (err: any) {
             console.error("Login fatal error:", err);
-            // Return the actual error message, not a generic timeout message
             return { success: false, error: err.message || "เกิดข้อผิดพลาดในการเข้าสู่ระบบ" };
         }
     };
