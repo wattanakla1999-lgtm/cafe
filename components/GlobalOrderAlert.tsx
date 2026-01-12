@@ -11,7 +11,12 @@ export function GlobalOrderAlert() {
     const router = useRouter();
     const pathname = usePathname();
 
+    // Blacklist customer-facing pages to prevent notifications when ordering
+    const isCustomerPage = ["/menu", "/cart", "/receipt", "/history"].some(path => pathname?.startsWith(path));
+
     useEffect(() => {
+        if (isCustomerPage) return;
+
         if (incomingOrder) {
             // Initial Alert Setup
             const initialDescription = `ลูกค้า: ${incomingOrder.customer_name || "-"} | ยอด: ฿${incomingOrder.total_amount}`;

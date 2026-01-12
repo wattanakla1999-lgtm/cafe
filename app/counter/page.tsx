@@ -15,6 +15,8 @@ import { useMenu } from "../../context/MenuContext";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
 
 
+import { FlyingItem } from "../../components/FlyingItem";
+
 export default function CounterPage() {
     const { menuItems, categories: contextCategories, discounts } = useMenu();
     const [activeCategory, setActiveCategory] = useState<Category>("All");
@@ -22,6 +24,7 @@ export default function CounterPage() {
     const [isModalOpen, setIsModalOpen] = useState(false);
     const [isHistoryOpen, setIsHistoryOpen] = useState(false);
     const [customerName, setCustomerName] = useState("");
+    const [orderNote, setOrderNote] = useState("");
     const [isReceiptPopupOpen, setIsReceiptPopupOpen] = useState(false);
     const [isQueueOpen, setIsQueueOpen] = useState(true);
     const [lastOrderId, setLastOrderId] = useState<string | null>(null);
@@ -30,8 +33,13 @@ export default function CounterPage() {
 
     const { addToCart, cart, removeFromCart, clearCart, submitOrder, orders, selectedDiscount, setDiscount, isSubmitting, incomingOrder, setIncomingOrder } = useOrder();
 
-    // Notification Logic moved to GlobalOrderAlert
-
+    // Animation States
+    const [flyingItems, setFlyingItems] = useState<{ id: number; src: string; startRect: DOMRect; targetRect: DOMRect }[]>([]);
+    const [animationId, setAnimationId] = useState(0);
+    const cartTargetRef = React.useRef<HTMLDivElement>(null);
+    const queueTargetRef = React.useRef<HTMLDivElement>(null);
+    const submitButtonRef = React.useRef<HTMLDivElement>(null);
+    const mobileCartRef = React.useRef<HTMLButtonElement>(null);
 
     // Categories for filter
     const categories = useMemo(() => ["All", ...contextCategories], [contextCategories]);
@@ -67,34 +75,74 @@ export default function CounterPage() {
         addToCart(item, options, quantity);
         setIsModalOpen(false);
         setSelectedItem(null);
+
+        // Animation: Item -> Cart
+        const isMobile = window.innerWidth < 1024;
+        const targetRef = isMobile ? mobileCartRef : cartTargetRef;
+
+        if (targetRef.current && item.image) {
+            const targetRect = targetRef.current.getBoundingClientRect();
+            const startRect = {
+                top: window.innerHeight / 2 - 100,
+                left: window.innerWidth / 2 - 100,
+                width: 200,
+                height: 200,
+                right: 0, bottom: 0, x: 0, y: 0, toJSON: () => { }
+            } as DOMRect;
+
+            setFlyingItems(prev => [...prev, {
+                id: animationId,
+                src: item.image!,
+                startRect,
+                targetRect
+            }]);
+            setAnimationId(prev => prev + 1);
+        }
     };
 
     const handleCheckout = async () => {
         if (cart.length === 0) return;
-        // submitOrder returns the ID or we need to refactor it to return ID
-        // Currently submitOrder is void/Promise<void> and optimistic updates.
-        // We will need to check if submitOrder can return the new ID or if we can get it from optimistic state.
 
-        // Refactoring handleCheckout to be async and capture ID if possible, 
-        // OR simply finding the 'optimistic' ID we just made. 
-        // Based on logic, submitOrder does optimistic update.
-        // Let's modify logic to generate ID here or assume submitOrder returns it.
-        // Checking Context... submitOrder is defined to return void.
-        // Let's assume we need to update submitOrder to return string | null first?
-        // Actually, submitOrder in Context has optimistic update that PUSHES to orders.
-        // We can just Peek the latest order? Or better, refactor submitOrder to return ID.
+        // Animation: Submit Button -> Queue
+        if (queueTargetRef.current && submitButtonRef.current && cart.length > 0) {
+            const targetRect = queueTargetRef.current.getBoundingClientRect();
+            const startRect = submitButtonRef.current.getBoundingClientRect();
+            // Use first item image or default
+            const src = cart[0].menuItem.image || "https://img.icons8.com/color/48/coffee-to-go.png";
 
-        // For now, let's assume I'll update submitOrder in next step.
-        const orderId = await submitOrder(customerName.trim() || "-", "Counter");
+            setFlyingItems(prev => [...prev, {
+                id: animationId,
+                src,
+                startRect,
+                targetRect
+            }]);
+            setAnimationId(prev => prev + 1);
+        }
+
+        // Small delay to let animation start before processing (optional)
+        await new Promise(r => setTimeout(r, 100));
+
+        const orderId = await submitOrder(customerName.trim() || "-", "Counter", undefined, orderNote.trim());
         if (orderId) setLastOrderId(orderId);
 
         setCustomerName("");
+        setOrderNote("");
         setIsReceiptPopupOpen(true);
     };
 
     return (
         <ProtectedRoute>
             <div className="min-h-screen bg-[var(--color-bg)] flex flex-col lg:flex-row h-screen overflow-hidden relative">
+                {/* Animation Layer */}
+                {flyingItems.map(item => (
+                    <FlyingItem
+                        key={item.id}
+                        src={item.src}
+                        startRect={item.startRect}
+                        targetRect={item.targetRect}
+                        onComplete={() => setFlyingItems(prev => prev.filter(i => i.id !== item.id))}
+                    />
+                ))}
 
                 {/* Left: Menu Area */}
                 <div className={`flex-col h-full bg-[var(--color-coffee-50)] min-w-0 flex-1 ${activeTab === "menu" ? "flex" : "hidden lg:flex"} `}>
@@ -158,7 +206,7 @@ export default function CounterPage() {
                 {/* Middle: Cart Sidebar */}
                 <div className={`w-full lg:w-80 xl:w-96 bg-white border-l border-r border-[var(--color-coffee-200)] flex-col h-full shrink-0 shadow-lg z-20 ${activeTab === "cart" ? "flex" : "hidden lg:flex"} `}>
                     <div className="p-4 border-b border-[var(--color-coffee-100)] bg-white shrink-0 flex justify-between items-center">
-                        <h2 className="font-bold text-lg text-[var(--color-coffee-900)]">รายการสั่งซื้อปัจจุบัน</h2>
+                        <h2 ref={cartTargetRef} className="font-bold text-lg text-[var(--color-coffee-900)]">รายการสั่งซื้อปัจจุบัน</h2>
                         <button
                             onClick={() => setIsQueueOpen(!isQueueOpen)}
                             className={`p-2 rounded-lg transition-colors hidden lg:block ${isQueueOpen ? "bg-[var(--color-coffee-100)] text-[var(--color-primary)]" : "text-[var(--color-coffee-400)] hover:bg-[var(--color-coffee-50)]"} `}
@@ -206,32 +254,47 @@ export default function CounterPage() {
                         )}
                     </div>
 
-                    <div className="p-4 bg-white border-t border-[var(--color-coffee-200)] space-y-4 shrink-0 mb-16 lg:mb-0">
-                        <div>
-                            <label className="block text-xs font-bold text-[var(--color-coffee-500)] uppercase mb-1">ชื่อลูกค้า</label>
-                            <input
-                                type="text"
-                                value={customerName}
-                                onChange={(e) => setCustomerName(e.target.value)}
-                                className="w-full p-2 border border-[var(--color-coffee-300)] rounded focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                                placeholder="กรอกชื่อ..."
-                            />
+                    <div className="p-2 lg:p-4 bg-white border-t border-[var(--color-coffee-200)] space-y-1 lg:space-y-4 shrink-0 mb-24 lg:mb-0">
+                        <div className="grid grid-cols-1 gap-1">
+                            <div>
+                                <label className="block text-[10px] lg:text-xs font-bold text-[var(--color-coffee-500)] uppercase mb-0 lg:mb-1">ชื่อลูกค้า</label>
+                                <input
+                                    type="text"
+                                    maxLength={50}
+                                    value={customerName}
+                                    onChange={(e) => setCustomerName(e.target.value)}
+                                    className="w-full p-1 lg:p-2 text-xs lg:text-sm border border-[var(--color-coffee-300)] rounded focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
+                                    placeholder="กรอกชื่อ..."
+                                />
+                            </div>
+
+                            <div>
+                                <label className="block text-[10px] lg:text-xs font-bold text-[var(--color-coffee-500)] uppercase mb-0 lg:mb-1">หมายเหตุ</label>
+                                <textarea
+                                    value={orderNote}
+                                    maxLength={135}
+                                    onChange={(e) => setOrderNote(e.target.value)}
+                                    className="w-full p-1 lg:p-2 text-xs lg:text-sm border border-[var(--color-coffee-300)] rounded focus:ring-2 focus:ring-[var(--color-primary)] outline-none resize-none"
+                                    placeholder="รายละเอียด..."
+                                    rows={1}
+                                />
+                            </div>
                         </div>
 
                         {/* Discount Section */}
-                        <div className="space-y-2 py-2">
+                        <div className="space-y-0.5 lg:space-y-2 py-0.5 lg:py-2">
                             <div className="flex justify-between items-center">
-                                <label className="text-xs font-bold text-[var(--color-coffee-500)] uppercase">ส่วนลด</label>
+                                <label className="text-[10px] lg:text-xs font-bold text-[var(--color-coffee-500)] uppercase">ส่วนลด</label>
                                 {selectedDiscount && (
                                     <button onClick={() => setDiscount(null)} className="text-[10px] text-red-500 hover:underline">ลบ</button>
                                 )}
                             </div>
-                            <div className="flex gap-2 flex-wrap">
+                            <div className="flex gap-1 lg:gap-2 flex-wrap">
                                 {discounts.filter(d => d.active).map(d => (
                                     <button
                                         key={d.id}
                                         onClick={() => setDiscount(selectedDiscount?.id === d.id ? null : d)}
-                                        className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${selectedDiscount?.id === d.id
+                                        className={`px-1.5 lg:px-3 py-0.5 lg:py-1.5 text-[10px] lg:text-xs rounded-lg border transition-all ${selectedDiscount?.id === d.id
                                             ? 'bg-[var(--color-primary)] text-white border-[var(--color-primary)] shadow-sm'
                                             : 'bg-white text-[var(--color-coffee-600)] border-[var(--color-coffee-300)] hover:bg-[var(--color-coffee-50)]'
                                             }`}
@@ -239,41 +302,44 @@ export default function CounterPage() {
                                         {d.name}
                                     </button>
                                 ))}
-                                {discounts.length === 0 && <span className="text-xs text-gray-400">ไม่มีส่วนลด</span>}
+                                {discounts.length === 0 && <span className="text-[10px] lg:text-xs text-gray-400">ไม่มีส่วนลด</span>}
                             </div>
                         </div>
 
-                        <div className="pt-4 border-t border-[var(--color-coffee-100)] space-y-1">
-                            <div className="flex justify-between items-center text-sm text-[var(--color-coffee-600)]">
+                        <div className="pt-1 lg:pt-4 border-t border-[var(--color-coffee-100)] space-y-0.5 lg:space-y-1">
+                            <div className="flex justify-between items-center text-[10px] lg:text-sm text-[var(--color-coffee-600)]">
                                 <span>ยอดรวมย่อย</span>
                                 <span>฿{subtotal}</span>
                             </div>
                             {selectedDiscount && (
-                                <div className="flex justify-between items-center text-sm text-[var(--color-primary)] font-medium">
+                                <div className="flex justify-between items-center text-[10px] lg:text-sm text-[var(--color-primary)] font-medium">
                                     <span>ส่วนลด ({selectedDiscount.name})</span>
                                     <span>-฿{Math.floor(discountAmount)}</span>
                                 </div>
                             )}
-                            <div className="flex justify-between items-center text-xl font-bold text-[var(--color-coffee-900)] pt-2">
+                            <div className="flex justify-between items-center text-base lg:text-xl font-bold text-[var(--color-coffee-900)] pt-0.5 lg:pt-2">
                                 <span>ยอดรวม</span>
                                 <span>฿{Math.floor(finalTotal)}</span>
                             </div>
                         </div>
 
-                        <Button
-                            fullWidth
-                            size="lg"
-                            onClick={handleCheckout}
-                            disabled={cart.length === 0 || isSubmitting}
-                        >
-                            {isSubmitting ? "กำลังดำเนินการ..." : "ยืนยันออเดอร์"}
-                        </Button>
+                        <div ref={submitButtonRef}>
+                            <Button
+                                fullWidth
+                                size="lg"
+                                onClick={handleCheckout}
+                                disabled={cart.length === 0 || isSubmitting}
+                                className="py-1.5 lg:py-3 text-sm lg:text-base h-auto min-h-0 font-extrabold shadow-md"
+                            >
+                                {isSubmitting ? "กำลังดำเนินการ..." : "ยืนยันออเดอร์"}
+                            </Button>
+                        </div>
                     </div>
                 </div>
 
                 {/* Right: Order Queue */}
                 {/* Wrap in div to handle mobile visibility + desktop flexible collapsing */}
-                <div className={`h-full shrink-0 z-30 transition-all duration-300 ${activeTab === "queue" ? "flex w-full" : "hidden lg:flex"} `}>
+                <div ref={queueTargetRef} className={`h-full shrink-0 z-30 transition-all duration-300 ${activeTab === "queue" ? "flex w-full" : "hidden lg:flex"} `}>
                     <OrderQueue isOpen={isQueueOpen || activeTab === "queue"} onClose={() => setIsQueueOpen(false)} />
                 </div>
 
@@ -291,6 +357,7 @@ export default function CounterPage() {
                     </button>
 
                     <button
+                        ref={mobileCartRef}
                         onClick={() => setActiveTab("cart")}
                         className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all flex-1 relative ${activeTab === "cart" ? "text-[var(--color-primary)] bg-[var(--color-coffee-50)] shadow-sm scale-105" : "text-[var(--color-coffee-400)] hover:bg-gray-50"} `}
                     >

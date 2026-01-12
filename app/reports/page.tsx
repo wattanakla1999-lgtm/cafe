@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import Link from "next/link";
 import { ProtectedRoute } from "../../components/ProtectedRoute";
+import { CustomDatePicker } from "../../components/CustomDatePicker";
 // import { generateMockReportData, ReportData } from "../../data/mockSales"; // REMOVE
 import { SummaryCards } from "../../components/reports/SummaryCards";
 import { SalesCharts } from "../../components/reports/SalesCharts";
@@ -42,6 +43,21 @@ export default function ReportsPage() {
     const [transactions, setTransactions] = useState<any[]>([]);
     const [totalCount, setTotalCount] = useState(0);
     const [isTableLoading, setIsTableLoading] = useState(false);
+
+    // Filter State
+    const [idInput, setIdInput] = useState(""); // Immediate input for UI
+    const [debouncedId, setDebouncedId] = useState(""); // Debounced value for API
+    const [filterStatus, setFilterStatus] = useState("all");
+    const [filterChannel, setFilterChannel] = useState("all");
+
+    // Debounce Effect
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            setDebouncedId(idInput);
+        }, 500); // 500ms delay
+
+        return () => clearTimeout(timer);
+    }, [idInput]);
 
     // 1. Fetch Summary Data (Charts, Totals) - Runs on Date Change
     useEffect(() => {
@@ -162,15 +178,40 @@ export default function ReportsPage() {
                 const to = from + 9;
 
                 // 1. Get Orders (Paginated)
-                const { data: orders, count, error } = await supabase
+                let query = supabase
                     .from("orders")
-                    .select("id, created_at, total_amount, channel, status, payment_method", { count: "exact" }) // count exact for pagination
+                    .select("id, created_at, total_amount, channel, status, payment_method, cancel_reason", { count: "exact" })
                     .eq("store_id", user.storeId)
                     .gte("created_at", startISO)
                     .lte("created_at", endISO)
-                    .neq("status", "cancelled")
-                    .order("created_at", { ascending: false })
-                    .range(from, to);
+                    .order("created_at", { ascending: false });
+
+                // Apply Filters
+                // Temporarily disabled: UUID search requires text casting which Supabase JS doesn't support well
+                // Users can still filter by status and channel
+                // TODO: Consider adding a separate indexed text column for order IDs if search is critical
+                /* if (debouncedId) {
+                    query = query.filter('id::text', 'ilike', `%${debouncedId}%`);
+                } */
+                if (filterStatus !== "all") {
+                    if (filterStatus === "pending") {
+                        // "pending" in filter means active orders (pending, cooking, ready)
+                        // OR just literally 'pending'? User request said "Status", usually implies granular.
+                        // But usually "Pending/Procesing" vs "Completed" vs "Cancelled".
+                        // Let's assume matching the dropdown I made: "pending" value in dropdown -> match pending, cooking, ready?
+                        // The dropdown has: Completed, Cancelled, Pending (waiting/cooking).
+                        // Let's map "pending" filter to pending, cooking, ready.
+                        query = query.in("status", ["pending", "cooking", "ready"]);
+                    } else {
+                        query = query.eq("status", filterStatus);
+                    }
+                }
+                if (filterChannel !== "all") {
+                    query = query.eq("channel", filterChannel);
+                }
+
+                // Range
+                const { data: orders, count, error } = await query.range(from, to);
 
                 if (error) throw error;
                 setTotalCount(count || 0);
@@ -196,7 +237,8 @@ export default function ReportsPage() {
                             total: Number(o.total_amount),
                             channel: o.channel || "Counter",
                             status: o.status,
-                            paymentMethod: o.payment_method || "Cash"
+                            paymentMethod: o.payment_method || "Cash",
+                            cancelReason: o.cancel_reason
                         };
                     });
                     setTransactions(mappedOrders);
@@ -206,13 +248,14 @@ export default function ReportsPage() {
 
             } catch (e) {
                 console.error("Transactions Fetch Error:", e);
+                setTransactions([]); // Clear on error to avoid showing misleading stale data
             } finally {
                 setIsTableLoading(false);
             }
         };
 
         fetchTransactions();
-    }, [user?.storeId, dateRange, currentPage]);
+    }, [user?.storeId, dateRange, currentPage, debouncedId, filterStatus, filterChannel]); // Re-fetch on debounced filter change
 
     return (
         <ProtectedRoute>
@@ -229,23 +272,28 @@ export default function ReportsPage() {
                             <h1 className="text-xl font-bold text-[var(--color-coffee-900)] whitespace-nowrap">แดชบอร์ดการขาย</h1>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-[var(--color-coffee-50)] p-2 rounded-lg border border-[var(--color-coffee-100)] w-full md:w-auto justify-center overflow-x-auto">
+                        <div className="flex items-center gap-2 bg-[var(--color-coffee-50)] p-2 rounded-lg border border-[var(--color-coffee-100)] w-full md:w-auto justify-center overflow-x-auto md:overflow-visible">
                             <div className="flex items-center gap-2 shrink-0">
                                 <span className="text-sm font-bold text-[var(--color-coffee-600)] whitespace-nowrap">จาก:</span>
-                                <input
-                                    type="date"
-                                    value={dateRange.start}
-                                    onChange={(e) => setDateRange(prev => ({ ...prev, start: e.target.value }))}
-                                    className="px-2 py-1 rounded border border-[var(--color-coffee-200)] text-sm outline-none focus:border-[var(--color-primary)] w-32 sm:w-auto"
+                                <CustomDatePicker
+                                    selected={parseISO(dateRange.start)}
+                                    onChange={(date) => date && setDateRange(prev => ({ ...prev, start: format(date, "yyyy-MM-dd") }))}
+                                    selectsStart
+                                    startDate={parseISO(dateRange.start)}
+                                    endDate={parseISO(dateRange.end)}
+                                    maxDate={new Date()} // Can't select future
                                 />
                             </div>
                             <div className="flex items-center gap-2 shrink-0">
                                 <span className="text-sm font-bold text-[var(--color-coffee-600)] whitespace-nowrap">ถึง:</span>
-                                <input
-                                    type="date"
-                                    value={dateRange.end}
-                                    onChange={(e) => setDateRange(prev => ({ ...prev, end: e.target.value }))}
-                                    className="px-2 py-1 rounded border border-[var(--color-coffee-200)] text-sm outline-none focus:border-[var(--color-primary)] w-32 sm:w-auto"
+                                <CustomDatePicker
+                                    selected={parseISO(dateRange.end)}
+                                    onChange={(date) => date && setDateRange(prev => ({ ...prev, end: format(date, "yyyy-MM-dd") }))}
+                                    selectsEnd
+                                    startDate={parseISO(dateRange.start)}
+                                    endDate={parseISO(dateRange.end)}
+                                    minDate={parseISO(dateRange.start)}
+                                    maxDate={new Date()}
                                 />
                             </div>
                         </div>
@@ -254,6 +302,7 @@ export default function ReportsPage() {
 
                 {/* Content */}
                 <main className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
+
 
                     {isLoading || !data ? (
                         <div className="flex flex-col items-center justify-center py-20 animate-pulse">
@@ -295,6 +344,12 @@ export default function ReportsPage() {
                                         totalCount={totalCount}
                                         onPageChange={setCurrentPage}
                                         isLoading={isTableLoading}
+                                        filterId={idInput}
+                                        setFilterId={setIdInput}
+                                        filterStatus={filterStatus}
+                                        setFilterStatus={setFilterStatus}
+                                        filterChannel={filterChannel}
+                                        setFilterChannel={setFilterChannel}
                                     />
                                 </div>
                                 <div className="lg:col-span-1">

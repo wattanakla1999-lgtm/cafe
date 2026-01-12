@@ -17,6 +17,7 @@ export interface MenuItem {
     allowedToppings?: string[]; // IDs of allowed toppings
     allowTypeSelection?: boolean; // Hot/Iced/Frappe
     allowBeanSelection?: boolean; // Dark/Medium/Light Roast
+    allowSweetnessSelection?: boolean; // 0%/25%/50%/100%
 }
 
 export const MENU_ITEMS: MenuItem[] = [

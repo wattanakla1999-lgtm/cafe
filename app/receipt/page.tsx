@@ -27,7 +27,7 @@ function ReceiptContent() {
                 const { data, error } = await supabase
                     .from("orders")
                     .select(`
-                        id, customer_name, total_amount, discount_info, status, created_at, channel, store_id,
+                        id, customer_name, total_amount, discount_info, status, created_at, channel, store_id, note,
                         store:stores(name),
                         order_items (
                             quantity, total_price, options, name,
@@ -51,6 +51,7 @@ function ReceiptContent() {
                         status: data.status,
                         timestamp: new Date(data.created_at),
                         channel: data.channel,
+                        note: data.note,
                         items: data.order_items.map((oi: any) => ({
                             itemId: oi.id, // This might be undefined in join, but oi is order_items row here
                             quantity: oi.quantity,
@@ -130,6 +131,13 @@ function ReceiptContent() {
                             </div>
                         ))}
                     </div>
+
+                    {order.note && (
+                        <div className="bg-[var(--color-coffee-50)] p-3 rounded-lg border border border-[var(--color-coffee-100)] text-left">
+                            <span className="text-xs font-bold text-[var(--color-coffee-600)] block mb-1">หมายเหตุ:</span>
+                            <span className="text-sm text-[var(--color-coffee-800)]">{order.note}</span>
+                        </div>
+                    )}
 
                     <div className="flex justify-between font-bold text-lg text-[var(--color-coffee-900)]">
                         <span>ยอดรวม</span>

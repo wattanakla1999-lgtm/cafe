@@ -14,7 +14,6 @@ export const metadata: Metadata = {
 };
 
 import { Providers } from "../components/Providers";
-import { DebugConsole } from "../components/DebugConsole";
 
 export default function RootLayout({
   children,
@@ -26,7 +25,6 @@ export default function RootLayout({
       <body className="antialiased font-sans">
         {/* Force Rebuild 1 */}
         <Providers>
-          <DebugConsole />
           {children}
         </Providers>
       </body>

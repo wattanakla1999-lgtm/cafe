@@ -3,6 +3,7 @@
 import React, { useState, useEffect } from "react";
 import { useMenu } from "../context/MenuContext";
 import { Button } from "./Button";
+import { useConfirm } from "../context/ConfirmContext";
 
 interface CategoryManagerModalProps {
     isOpen: boolean;
@@ -11,6 +12,7 @@ interface CategoryManagerModalProps {
 
 export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalProps) {
     const { menuItems, categories, updateCategory, deleteCategory, addCategory } = useMenu();
+    const { confirm } = useConfirm();
 
     // State
     const [mode, setMode] = useState<"list" | "edit" | "add">("list");
@@ -69,9 +71,17 @@ export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalPr
         setMode("list");
     };
 
-    const handleDelete = (cat: string) => {
+    const handleDelete = async (cat: string) => {
         const count = menuItems.filter(i => i.category === cat).length;
-        if (confirm(`Are you sure? This will move ${count} items to "Uncategorized".`)) {
+        const confirmed = await confirm({
+            title: "ลบหมวดหมู่นี้?",
+            message: `คุณแน่ใจหรือไม่? รายการ ${count} รายการจะถูกย้ายไปที่ "Uncategorized"`,
+            confirmText: "ลบหมวดหมู่",
+            cancelText: "ยกเลิก",
+            variant: "warning"
+        });
+
+        if (confirmed) {
             deleteCategory(cat);
         }
     };

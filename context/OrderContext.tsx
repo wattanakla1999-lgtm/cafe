@@ -21,10 +21,11 @@ export interface Order {
     items: OrderItem[];
     totalAmount: number;
     discount?: { name: string, value: number, type: "percent" | "amount", amountOff: number };
-    status: "pending" | "completed" | "cancelled";
+    status: "pending" | "cooking" | "ready" | "completed" | "cancelled";
     timestamp: Date;
     channel: "QR" | "Counter";
     store_id?: string;
+    note?: string;
 }
 
 interface OrderContextType {
@@ -32,8 +33,9 @@ interface OrderContextType {
     addToCart: (item: MenuItem, options: Option[], quantity: number) => void;
     removeFromCart: (itemId: string) => void;
     clearCart: () => void;
-    submitOrder: (customerName: string, channel: "QR" | "Counter", overrideStoreId?: string) => Promise<string | undefined>;
+    submitOrder: (customerName: string, channel: "QR" | "Counter", overrideStoreId?: string, note?: string) => Promise<string | undefined>;
     orders: Order[];
+    updateOrderStatus: (orderId: string, status: Order["status"], reason?: string) => Promise<void>;
     completeOrder: (orderId: string) => Promise<void>;
     callOrder: (orderId: string) => void;
     currentCalling: string | null;
@@ -126,6 +128,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                         status: o.status,
                         timestamp: new Date(o.created_at),
                         channel: o.channel,
+                        note: o.note,
                         items: o.order_items.map((oi: any) => ({
                             itemId: oi.id,
                             quantity: oi.quantity,
@@ -260,7 +263,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
     const clearCart = () => setCart([]);
 
-    const submitOrder = async (customerName: string, channel: "QR" | "Counter", overrideStoreId?: string): Promise<string | undefined> => {
+    const submitOrder = async (customerName: string, channel: "QR" | "Counter", overrideStoreId?: string, note?: string): Promise<string | undefined> => {
         const targetStoreId = user?.storeId || overrideStoreId;
         if (cart.length === 0 || !targetStoreId) {
             console.error("Submit aborted: No store ID", { userStore: user?.storeId, override: overrideStoreId });
@@ -299,7 +302,8 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                     total_amount: totalAmount,
                     discount_info: discountInfo,
                     status: "pending",
-                    channel: channel
+                    channel: channel,
+                    note: note
                 }])
                 .select()
                 .single();
@@ -336,6 +340,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                         status: "pending",
                         timestamp: new Date(),
                         channel: orderData.channel as "QR" | "Counter",
+                        note: orderData.note,
                         items: cart.map(item => ({ ...item }))
                     };
                     setOrders(prev => [newOrder, ...prev]);
@@ -368,28 +373,35 @@ export function OrderProvider({ children }: { children: ReactNode }) {
         }
     };
 
-    const completeOrder = async (orderId: string) => {
-        // Optimistic Update: Remove from local state immediately
-        setOrders(prev => prev.filter(o => o.id !== orderId));
+    const updateOrderStatus = async (orderId: string, status: Order["status"], reason?: string) => {
+        // Optimistic Update
+        setOrders(prev => prev.map(o => o.id === orderId ? { ...o, status } : o));
 
         try {
+            const updatePayload: any = { status };
+            if (status === 'cancelled' && reason) {
+                updatePayload.cancel_reason = reason;
+            }
+
             const { error } = await supabase
                 .from("orders")
-                .update({ status: "completed" })
+                .update(updatePayload)
                 .eq("id", orderId);
 
             if (error) {
-                // Revert if error (optional, but good practice - for MVP we might skip revert logic for simplicity or just re-fetch)
-                throw error;
+                // Revert on error
+                // For MVP, we might just log or re-fetch. Ideally revert state.
+                console.error("Error updating status:", error);
+                // Revert to re-fetch
+                const { data: { user } } = await supabase.auth.getUser(); // dummy check
             }
         } catch (error) {
-            console.error("Error completing order:", error);
-            // Verify state by re-fetching if error occurs
-            const { data: { user } } = await supabase.auth.getUser();
-            if (user?.id) {
-                // Trigger re-fetch logic if we had it exposed, or just alert.
-            }
+            console.error("Exception updating status:", error);
         }
+    };
+
+    const completeOrder = async (orderId: string) => {
+        await updateOrderStatus(orderId, "completed");
     };
 
     const callOrder = (customerName: string) => {
@@ -409,6 +421,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
             clearCart,
             submitOrder,
             orders,
+            updateOrderStatus,
             completeOrder,
             callOrder,
             currentCalling,

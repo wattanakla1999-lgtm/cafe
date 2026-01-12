@@ -70,6 +70,11 @@ export function OrderHistoryPopup({ isOpen, onClose }: OrderHistoryPopupProps) {
                                         <div className="text-xs text-[var(--color-coffee-500)]">
                                             {new Date(order.timestamp).toLocaleTimeString()}
                                         </div>
+                                        {order.note && (
+                                            <div className="mt-1 text-xs text-[var(--color-primary)] font-medium bg-[var(--color-primary)]/5 p-1.5 rounded border border-[var(--color-primary)]/10">
+                                                📝 Note: {order.note}
+                                            </div>
+                                        )}
                                     </div>
                                     <div className="text-xl font-bold text-[var(--color-primary)]">
                                         ฿{order.totalAmount}

@@ -14,6 +14,7 @@ import { DiscountManagerModal } from "../../../components/DiscountManagerModal";
 import { ToppingManagerModal } from "../../../components/ToppingManagerModal";
 import { StoreSettingsModal } from "../../../components/StoreSettingsModal";
 import { ProtectedRoute } from "../../../components/ProtectedRoute";
+import { useConfirm } from "../../../context/ConfirmContext";
 
 // Helper Component for Mobile Dropdown
 function MenuDropdown({
@@ -129,6 +130,7 @@ function MenuContent() {
     const [isServingTypeManagerOpen, setIsServingTypeManagerOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
+    const { confirm } = useConfirm();
 
     useEffect(() => {
         if (searchParams.get("modal") === "discounts") {
@@ -161,8 +163,16 @@ function MenuContent() {
         setIsModalOpen(true);
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm("Are you sure you want to delete this item?")) {
+    const handleDelete = async (id: string) => {
+        const confirmed = await confirm({
+            title: "ลบเมนูนี้?",
+            message: "คุณแน่ใจหรือไม่ที่จะลบเมนูนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+            confirmText: "ลบเมนู",
+            cancelText: "ยกเลิก",
+            variant: "danger"
+        });
+
+        if (confirmed) {
             deleteMenuItem(id);
         }
     };

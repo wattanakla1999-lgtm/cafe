@@ -15,7 +15,7 @@ interface MenuFormModalProps {
 }
 
 export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFormModalProps) {
-    const { menuItems, categories, toppings } = useMenu();
+    const { menuItems, categories, toppings, addCategory, addTopping, servingTypes } = useMenu();
 
     const [formData, setFormData] = useState<Omit<MenuItem, "id">>({
         name: "",
@@ -27,7 +27,14 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
         allowedToppings: [],
         allowTypeSelection: false,
         allowBeanSelection: false,
+        allowSweetnessSelection: false,
     });
+    const [priceInput, setPriceInput] = useState<string>("");
+    const [showQuickCategoryAdd, setShowQuickCategoryAdd] = useState(false);
+    const [newCategoryName, setNewCategoryName] = useState("");
+    const [showQuickToppingAdd, setShowQuickToppingAdd] = useState(false);
+    const [newToppingName, setNewToppingName] = useState("");
+    const [newToppingPrice, setNewToppingPrice] = useState("");
 
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string>("");
@@ -46,7 +53,9 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                     allowedToppings: initialData.allowedToppings || [],
                     allowTypeSelection: initialData.allowTypeSelection || false,
                     allowBeanSelection: initialData.allowBeanSelection || false,
+                    allowSweetnessSelection: initialData.allowSweetnessSelection || false,
                 });
+                setPriceInput(initialData.price.toString());
                 setPreviewUrl(initialData.image || "");
             } else {
                 setFormData({
@@ -59,7 +68,9 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                     allowedToppings: [],
                     allowTypeSelection: false,
                     allowBeanSelection: false,
+                    allowSweetnessSelection: false,
                 });
+                setPriceInput("");
                 setPreviewUrl("");
             }
             setImageFile(null);
@@ -118,6 +129,30 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Auto-insert default serving types if user enables it for the first time
+        if (formData.allowTypeSelection && servingTypes.length === 0) {
+            try {
+                const { data: { user } } = await supabase.auth.getUser();
+                if (user) {
+                    const { data: storeData } = await supabase
+                        .from("stores")
+                        .select("id")
+                        .eq("user_id", user.id)
+                        .single();
+
+                    if (storeData) {
+                        await supabase.from("serving_types").insert([
+                            { store_id: storeData.id, name: "ร้อน", price: 0 },
+                            { store_id: storeData.id, name: "เย็น", price: 0 },
+                            { store_id: storeData.id, name: "ปั่น", price: 0 }
+                        ]);
+                    }
+                }
+            } catch (error) {
+                console.error("Error creating default serving types:", error);
+            }
+        }
 
         let finalImageUrl = formData.image;
 
@@ -208,40 +243,107 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                     <div>
                         <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ราคา (บาท)</label>
                         <input
-                            type="number"
-                            min="0"
-                            step="0.01"
-                            max="1000000"
+                            type="text"
+                            inputMode="decimal"
+                            maxLength={8}
                             required
-                            value={formData.price}
-                            onChange={e => setFormData({ ...formData, price: parseFloat(e.target.value) || 0 })}
+                            value={priceInput}
+                            onChange={e => {
+                                const value = e.target.value;
+                                // Allow empty, digits, and one decimal point
+                                if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                    setPriceInput(value);
+                                    setFormData({ ...formData, price: parseFloat(value) || 0 });
+                                }
+                            }}
                             className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
-                            placeholder="0.00"
+                            placeholder="ระบุราคา"
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">หมวดหมู่</label>
-                        <div className="relative">
-                            <select
-                                required
-                                value={formData.category}
-                                onChange={e => setFormData({ ...formData, category: e.target.value })}
-                                className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all appearance-none bg-white"
-                            >
-                                <option value="" disabled>เลือกหมวดหมู่</option>
-                                {categories.map((cat) => (
-                                    <option key={cat} value={cat}>
-                                        {cat}
-                                    </option>
-                                ))}
-                            </select>
-                            <div className="absolute inset-y-0 right-0 flex items-center px-2 pointer-events-none text-[var(--color-coffee-500)]">
-                                <svg className="w-4 h-4" fill="none" stroke="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7"></path>
-                                </svg>
-                            </div>
+                    <div>
+                        <div className="flex items-center justify-between mb-1">
+                            <label className="block text-sm font-bold text-[var(--color-coffee-700)]">หมวดหมู่</label>
+                            {!showQuickCategoryAdd && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowQuickCategoryAdd(true)}
+                                    className="text-xs text-[var(--color-primary)] hover:text-[var(--color-coffee-800)] hover:underline font-medium flex items-center gap-1 transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    สร้างหมวดหมู่ใหม่
+                                </button>
+                            )}
                         </div>
+
+                        {showQuickCategoryAdd ? (
+                            <div className="space-y-2">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newCategoryName}
+                                        onChange={e => setNewCategoryName(e.target.value)}
+                                        placeholder="ชื่อหมวดหมู่ใหม่"
+                                        maxLength={50}
+                                        className="flex-1 p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
+                                        autoFocus
+                                    />
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const trimmed = newCategoryName.trim();
+                                            if (trimmed && !categories.includes(trimmed)) {
+                                                addCategory(trimmed);
+                                                setFormData({ ...formData, category: trimmed });
+                                                setShowQuickCategoryAdd(false);
+                                                setNewCategoryName("");
+                                            } else if (categories.includes(trimmed)) {
+                                                alert("หมวดหมู่นี้มีอยู่แล้ว");
+                                            } else {
+                                                alert("กรุณาระบุชื่อหมวดหมู่");
+                                            }
+                                        }}
+                                        className="px-4 py-2.5 bg-[var(--color-primary)] text-white rounded-lg cursor-pointer transition-colors font-medium"
+                                    >
+                                        เพิ่ม
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowQuickCategoryAdd(false);
+                                            setNewCategoryName("");
+                                        }}
+                                        className="px-4 py-2.5 border border-[var(--color-coffee-300)] text-[var(--color-coffee-700)] rounded-lg cursor-pointer hover:bg-[var(--color-coffee-50)] transition-colors"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                </div>
+                                {categories.length > 0 && (
+                                    <p className="text-xs text-[var(--color-coffee-500)]">
+                                        หรือเลือกจากหมวดหมู่ที่มีอยู่:
+                                    </p>
+                                )}
+                            </div>
+                        ) : null}
+
+                        {!showQuickCategoryAdd && (
+                            <div className="relative">
+                                <Combobox
+                                    value={formData.category}
+                                    onChange={(value) => setFormData({ ...formData, category: value })}
+                                    options={categories}
+                                    placeholder="เลือกหมวดหมู่"
+                                />
+                            </div>
+                        )}
+
+                        {categories.length === 0 && !showQuickCategoryAdd && (
+                            <p className="text-xs text-[var(--color-coffee-500)] mt-1">
+                                💡 ยังไม่มีหมวดหมู่ กดปุ่ม "สร้างหมวดหมู่ใหม่" ด้านบนเพื่อเพิ่ม
+                            </p>
+                        )}
                     </div>
                     <div>
                         <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">รายละเอียด</label>
@@ -256,7 +358,85 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                     </div>
 
                     <div>
-                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-2">ท็อปปิ้งที่เลือกได้</label>
+                        <div className="flex items-center justify-between mb-2">
+                            <label className="block text-sm font-bold text-[var(--color-coffee-700)]">ท็อปปิ้งที่เลือกได้</label>
+                            {!showQuickToppingAdd && (
+                                <button
+                                    type="button"
+                                    onClick={() => setShowQuickToppingAdd(true)}
+                                    className="text-xs text-[var(--color-primary)] hover:text-[var(--color-coffee-800)] hover:underline font-medium flex items-center gap-1 transition-colors"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
+                                    </svg>
+                                    สร้างท็อปปิ้งใหม่
+                                </button>
+                            )}
+                        </div>
+
+                        {showQuickToppingAdd && (
+                            <div className="mb-3 p-3 bg-[var(--color-coffee-50)] border border-[var(--color-coffee-200)] rounded-lg space-y-2">
+                                <div className="flex gap-2">
+                                    <input
+                                        type="text"
+                                        value={newToppingName}
+                                        onChange={e => setNewToppingName(e.target.value)}
+                                        placeholder="ชื่อท็อปปิ้ง"
+                                        maxLength={50}
+                                        className="flex-1 p-2 text-sm border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
+                                    />
+                                    <input
+                                        type="text"
+                                        inputMode="decimal"
+                                        value={newToppingPrice}
+                                        onChange={e => {
+                                            const value = e.target.value;
+                                            if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                                setNewToppingPrice(value);
+                                            }
+                                        }}
+                                        placeholder="ราคา"
+                                        maxLength={6}
+                                        className="w-20 p-2 text-sm border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
+                                    />
+                                </div>
+                                <div className="flex gap-2">
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            const trimmedName = newToppingName.trim();
+                                            const price = parseFloat(newToppingPrice);
+
+                                            if (trimmedName && !isNaN(price) && price >= 0) {
+                                                addTopping({ name: trimmedName, price: price });
+                                                setShowQuickToppingAdd(false);
+                                                setNewToppingName("");
+                                                setNewToppingPrice("");
+                                            } else if (!trimmedName) {
+                                                alert("กรุณาระบุชื่อท็อปปิ้ง");
+                                            } else {
+                                                alert("กรุณาระบุราคาที่ถูกต้อง");
+                                            }
+                                        }}
+                                        className="px-3 py-1.5 bg-[var(--color-primary)] text-white rounded-lg cursor-pointer transition-colors font-medium text-sm"
+                                    >
+                                        เพิ่ม
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => {
+                                            setShowQuickToppingAdd(false);
+                                            setNewToppingName("");
+                                            setNewToppingPrice("");
+                                        }}
+                                        className="px-3 py-1.5 border border-[var(--color-coffee-300)] text-[var(--color-coffee-700)] rounded-lg cursor-pointer hover:bg-[var(--color-coffee-50)] transition-colors text-sm"
+                                    >
+                                        ยกเลิก
+                                    </button>
+                                </div>
+                            </div>
+                        )}
+
                         <div className="grid grid-cols-2 gap-2 max-h-40 overflow-y-auto p-2 border border-[var(--color-coffee-100)] rounded-lg bg-[var(--color-coffee-50)]">
                             {toppings.map(t => (
                                 <label key={t.id} className="flex items-center space-x-2 bg-white p-2 rounded border border-[var(--color-coffee-100)] cursor-pointer hover:border-[var(--color-primary)]">
@@ -276,7 +456,11 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                                     <span className="text-sm text-[var(--color-coffee-700)]">{t.name}</span>
                                 </label>
                             ))}
-                            {toppings.length === 0 && <p className="text-xs text-gray-500 col-span-2 text-center py-2">ไม่มีท็อปปิ้ง</p>}
+                            {toppings.length === 0 && !showQuickToppingAdd && (
+                                <p className="text-xs text-[var(--color-coffee-500)] col-span-2 text-center py-2">
+                                    💡 ยังไม่มีท็อปปิ้ง กดปุ่ม "สร้างท็อปปิ้งใหม่" ด้านบนเพื่อเพิ่ม
+                                </p>
+                            )}
                         </div>
                     </div>
 
@@ -314,6 +498,24 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                                     เมล็ดกาแฟ
                                 </label>
                                 <p className="text-[var(--color-coffee-500)] text-xs">คั่วเข้ม, คั่วกลาง, คั่วอ่อน</p>
+                            </div>
+                        </div>
+
+                        <div className="flex items-center gap-3 bg-[var(--color-coffee-50)] p-3 rounded-lg border border-[var(--color-coffee-100)]">
+                            <div className="flex items-center h-5">
+                                <input
+                                    id="allowSweetness"
+                                    type="checkbox"
+                                    checked={formData.allowSweetnessSelection}
+                                    onChange={e => setFormData({ ...formData, allowSweetnessSelection: e.target.checked })}
+                                    className="w-5 h-5 text-[var(--color-primary)] border-[var(--color-coffee-300)] rounded focus:ring-[var(--color-primary)] cursor-pointer"
+                                />
+                            </div>
+                            <div className="text-sm">
+                                <label htmlFor="allowSweetness" className="font-bold text-[var(--color-coffee-800)] cursor-pointer select-none">
+                                    ระดับความหวาน
+                                </label>
+                                <p className="text-[var(--color-coffee-500)] text-xs">0%, 25%, 50%, 100%</p>
                             </div>
                         </div>
                     </div>

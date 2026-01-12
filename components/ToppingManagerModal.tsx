@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useMenu } from "../context/MenuContext";
 import { Button } from "./Button";
 import { Option } from "../data/mock";
+import { useConfirm } from "../context/ConfirmContext";
 
 interface ToppingManagerModalProps {
     isOpen: boolean;
@@ -12,6 +13,7 @@ interface ToppingManagerModalProps {
 
 export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProps) {
     const { toppings, addTopping, updateTopping, deleteTopping } = useMenu();
+    const { confirm } = useConfirm();
     const [editingTopping, setEditingTopping] = useState<Option | null>(null);
     const [newName, setNewName] = useState("");
     const [newPrice, setNewPrice] = useState("");
@@ -40,7 +42,7 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
     const handleAdd = () => {
         setEditingTopping(null);
         setNewName("");
-        setNewPrice("0");
+        setNewPrice("");
         setMode("add");
         setError("");
     };
@@ -74,8 +76,16 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
         setMode("list");
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm("Are you sure you want to delete this topping? This action cannot be undone.")) {
+    const handleDelete = async (id: string) => {
+        const confirmed = await confirm({
+            title: "ลบท็อปปิ้งนี้?",
+            message: "คุณแน่ใจหรือไม่ที่จะลบท็อปปิ้งนี้? การดำเนินการนี้ไม่สามารถย้อนกลับได้",
+            confirmText: "ลบ",
+            cancelText: "ยกเลิก",
+            variant: "danger"
+        });
+
+        if (confirmed) {
             deleteTopping(id);
         }
     };
@@ -144,11 +154,17 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
                             <div>
                                 <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ราคา (฿)</label>
                                 <input
-                                    type="number"
-                                    max="1000000"
+                                    type="text"
+                                    inputMode="decimal"
+                                    maxLength={8}
                                     value={newPrice}
-                                    onChange={(e) => setNewPrice(e.target.value)}
-                                    placeholder="0"
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                            setNewPrice(value);
+                                        }
+                                    }}
+                                    placeholder="ระบุราคา"
                                     className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
                                 />
                             </div>

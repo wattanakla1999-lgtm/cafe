@@ -4,6 +4,7 @@ import React, { useState, useEffect } from "react";
 import { useMenu } from "../context/MenuContext";
 import { Button } from "./Button";
 import { Option } from "../data/mock";
+import { useConfirm } from "../context/ConfirmContext";
 
 interface ServingTypeManagerModalProps {
     isOpen: boolean;
@@ -12,10 +13,12 @@ interface ServingTypeManagerModalProps {
 
 export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerModalProps) {
     const { servingTypes, addServingType, updateServingType, deleteServingType } = useMenu();
+    const { confirm } = useConfirm();
 
     const [mode, setMode] = useState<"list" | "edit" | "add">("list");
     const [editingType, setEditingType] = useState<Option | null>(null);
     const [formData, setFormData] = useState({ name: "", price: 0 });
+    const [priceInput, setPriceInput] = useState<string>("");
     const [error, setError] = useState("");
 
     useEffect(() => {
@@ -24,6 +27,7 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
             setEditingType(null);
             setError("");
             setFormData({ name: "", price: 0 });
+            setPriceInput("");
         }
     }, [isOpen]);
 
@@ -32,6 +36,7 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
     const handleStartAdd = () => {
         setMode("add");
         setFormData({ name: "", price: 0 });
+        setPriceInput("");
         setEditingType(null);
         setError("");
     };
@@ -39,6 +44,7 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
     const handleStartEdit = (type: Option) => {
         setMode("edit");
         setFormData({ name: type.name, price: type.price });
+        setPriceInput(type.price.toString());
         setEditingType(type);
         setError("");
     };
@@ -61,7 +67,15 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
     };
 
     const handleDelete = async (id: string) => {
-        if (confirm("Are you sure you want to delete this serving type?")) {
+        const confirmed = await confirm({
+            title: "ลบรูปแบบการเสิร์ฟนี้?",
+            message: "คุณแน่ใจหรือไม่ที่จะลบรูปแบบการเสิร์ฟนี้?",
+            confirmText: "ลบ",
+            cancelText: "ยกเลิก",
+            variant: "danger"
+        });
+
+        if (confirmed) {
             await deleteServingType(id);
         }
     };
@@ -133,11 +147,18 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
                             <div>
                                 <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ราคาเพิ่ม (฿)</label>
                                 <input
-                                    type="number"
-                                    min="0"
-                                    max="1000000"
-                                    value={formData.price}
-                                    onChange={(e) => setFormData({ ...formData, price: Number(e.target.value) })}
+                                    type="text"
+                                    inputMode="decimal"
+                                    maxLength={8}
+                                    value={priceInput}
+                                    onChange={(e) => {
+                                        const value = e.target.value;
+                                        if (value === "" || /^\d*\.?\d*$/.test(value)) {
+                                            setPriceInput(value);
+                                            setFormData({ ...formData, price: parseFloat(value) || 0 });
+                                        }
+                                    }}
+                                    placeholder="ระบุราคา"
                                     className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
                                 />
                             </div>

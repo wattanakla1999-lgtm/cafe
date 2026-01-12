@@ -23,9 +23,9 @@ interface MenuContextType {
     updateCategory: (oldName: string, newName: string) => Promise<void>;
     deleteCategory: (categoryName: string) => Promise<void>;
     addCategory: (categoryName: string) => Promise<void>;
-    addDiscount: (discount: Omit<Discount, "id">) => void;
-    updateDiscount: (id: string, discount: Partial<Discount>) => void;
-    deleteDiscount: (id: string) => void;
+    addDiscount: (discount: Omit<Discount, "id">) => Promise<void>;
+    updateDiscount: (id: string, discount: Partial<Discount>) => Promise<void>;
+    deleteDiscount: (id: string) => Promise<void>;
     toppings: Option[];
     addTopping: (topping: Omit<Option, "id">) => Promise<void>;
     updateTopping: (id: string, updates: Partial<Option>) => Promise<void>;
@@ -45,11 +45,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     const { user, isLoading: authLoading } = useAuth();
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
-    const [discounts, setDiscounts] = useState<Discount[]>([
-        { id: "d1", name: "ลด 10%", type: "percent", value: 10, active: true },
-        { id: "d2", name: "ลด 5฿", type: "amount", value: 5, active: true },
-        { id: "d3", name: "อาหารพนักงาน", type: "percent", value: 100, active: true },
-    ]);
+    const [discounts, setDiscounts] = useState<Discount[]>([]);
     const [toppings, setToppings] = useState<Option[]>([]);
     const [servingTypes, setServingTypes] = useState<Option[]>([]);
     const [isLoading, setIsLoading] = useState(true);
@@ -85,7 +81,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Parallel Data Fetching
-            const [categoriesRes, toppingsRes, menuRes, servingTypesRes] = await Promise.all([
+            const [categoriesRes, toppingsRes, menuRes, servingTypesRes, discountsRes] = await Promise.all([
                 // 1. Categories
                 supabase
                     .from("categories")
@@ -103,7 +99,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 supabase
                     .from("menu_items")
                     .select(`
-                        id, name, price, description, image, available, allowed_toppings, allow_type_selection, allow_bean_selection,
+                        id, name, price, description, image, available, allowed_toppings, allow_type_selection, allow_bean_selection, allow_sweetness_selection,
                         category:categories(name)
                     `)
                     .eq("store_id", targetStoreId),
@@ -113,7 +109,13 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                     .from("serving_types")
                     .select("id, name, price")
                     .eq("store_id", targetStoreId)
-                    .order("price", { ascending: true })
+                    .order("price", { ascending: true }),
+
+                // 5. Discounts
+                supabase
+                    .from("discounts")
+                    .select("id, name, value, type, active")
+                    .eq("store_id", targetStoreId)
             ]);
 
             // Process Results
@@ -129,6 +131,10 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 setServingTypes(servingTypesRes.data);
             }
 
+            if (discountsRes.data) {
+                setDiscounts(discountsRes.data);
+            }
+
             if (menuRes.data) {
                 const mappedItems: MenuItem[] = menuRes.data.map((item: any) => ({
                     id: item.id,
@@ -140,7 +146,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                     available: item.available,
                     allowedToppings: item.allowed_toppings,
                     allowTypeSelection: item.allow_type_selection,
-                    allowBeanSelection: item.allow_bean_selection
+                    allowBeanSelection: item.allow_bean_selection,
+                    allowSweetnessSelection: item.allow_sweetness_selection
                 }));
                 setMenuItems(mappedItems);
             }
@@ -156,17 +163,44 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         fetchMenuData();
     }, [fetchMenuData]);
 
-    // --- Discounts (Still Mock for now) ---
-    const addDiscount = (discount: Omit<Discount, "id">) => {
-        setDiscounts(prev => [...prev, { ...discount, id: `d_${Date.now()}` }]);
+    // --- Discounts ---
+    const addDiscount = async (discount: Omit<Discount, "id">) => {
+        if (!user?.storeId) return;
+        setIsLoading(true);
+        try {
+            await supabase.from("discounts").insert([{
+                store_id: user.storeId,
+                name: discount.name,
+                value: discount.value,
+                type: discount.type,
+                active: discount.active
+            }]);
+            await fetchMenuData();
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const updateDiscount = (id: string, updates: Partial<Discount>) => {
-        setDiscounts(prev => prev.map(d => d.id === id ? { ...d, ...updates } : d));
+    const updateDiscount = async (id: string, updates: Partial<Discount>) => {
+        if (!user?.storeId) return;
+        setIsLoading(true);
+        try {
+            await supabase.from("discounts").update(updates).eq("id", id);
+            await fetchMenuData();
+        } finally {
+            setIsLoading(false);
+        }
     };
 
-    const deleteDiscount = (id: string) => {
-        setDiscounts(prev => prev.filter(d => d.id !== id));
+    const deleteDiscount = async (id: string) => {
+        if (!user?.storeId) return;
+        setIsLoading(true);
+        try {
+            await supabase.from("discounts").delete().eq("id", id);
+            await fetchMenuData();
+        } finally {
+            setIsLoading(false);
+        }
     };
 
     // --- Toppings ---
@@ -356,7 +390,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 available: item.available,
                 allowed_toppings: item.allowedToppings || [],
                 allow_type_selection: item.allowTypeSelection || false,
-                allow_bean_selection: item.allowBeanSelection || false
+                allow_bean_selection: item.allowBeanSelection || false,
+                allow_sweetness_selection: item.allowSweetnessSelection || false
             }]);
             await fetchMenuData();
         } finally {
@@ -382,6 +417,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             if (updates.allowedToppings !== undefined) dbUpdates.allowed_toppings = updates.allowedToppings;
             if (updates.allowTypeSelection !== undefined) dbUpdates.allow_type_selection = updates.allowTypeSelection;
             if (updates.allowBeanSelection !== undefined) dbUpdates.allow_bean_selection = updates.allowBeanSelection;
+            if (updates.allowSweetnessSelection !== undefined) dbUpdates.allow_sweetness_selection = updates.allowSweetnessSelection;
 
             // Handle category update
             if (updates.category) {

@@ -3,6 +3,8 @@
 import React, { useState, useEffect } from "react";
 import { Discount, useMenu } from "../context/MenuContext";
 import { Button } from "./Button";
+import { useConfirm } from "../context/ConfirmContext";
+import { Select } from "./ui/Select";
 
 interface DiscountManagerModalProps {
     isOpen: boolean;
@@ -11,12 +13,14 @@ interface DiscountManagerModalProps {
 
 export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalProps) {
     const { discounts, addDiscount, updateDiscount, deleteDiscount } = useMenu();
+    const { confirm } = useConfirm();
 
     // State
     const [mode, setMode] = useState<"list" | "edit" | "add">("list");
     const [editingDiscount, setEditingDiscount] = useState<Discount | null>(null);
     const [name, setName] = useState("");
     const [value, setValue] = useState<number>(0);
+    const [valueInput, setValueInput] = useState<string>("");
     const [type, setType] = useState<"percent" | "amount">("percent");
     const [error, setError] = useState("");
 
@@ -36,6 +40,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
         setEditingDiscount(null);
         setName("");
         setValue(0);
+        setValueInput("");
         setType("percent");
         setError("");
     };
@@ -45,11 +50,12 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
         setEditingDiscount(discount);
         setName(discount.name);
         setValue(discount.value);
+        setValueInput(discount.value.toString());
         setType(discount.type);
         setError("");
     };
 
-    const handleSave = () => {
+    const handleSave = async () => {
         if (!name.trim()) {
             setError("Name is required");
             return;
@@ -60,14 +66,14 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
         }
 
         if (mode === "add") {
-            addDiscount({
+            await addDiscount({
                 name: name.trim(),
                 value: value,
                 type: type,
                 active: true
             });
         } else if (mode === "edit" && editingDiscount) {
-            updateDiscount(editingDiscount.id, {
+            await updateDiscount(editingDiscount.id, {
                 name: name.trim(),
                 value: value,
                 type: type
@@ -77,9 +83,17 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
         setMode("list");
     };
 
-    const handleDelete = (id: string) => {
-        if (confirm("Delete this discount?")) {
-            deleteDiscount(id);
+    const handleDelete = async (id: string) => {
+        const confirmed = await confirm({
+            title: "ลบส่วนลดนี้?",
+            message: "คุณแน่ใจหรือไม่ที่จะลบส่วนลดนี้?",
+            confirmText: "ลบ",
+            cancelText: "ยกเลิก",
+            variant: "danger"
+        });
+
+        if (confirmed) {
+            await deleteDiscount(id);
         }
     };
 
@@ -159,25 +173,31 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
                                 <div>
                                     <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">มูลค่า</label>
                                     <input
-                                        type="number"
-                                        placeholder="0"
-                                        min="0"
-                                        max={type === "percent" ? 100 : 1000000}
-                                        value={value}
-                                        onChange={(e) => setValue(Number(e.target.value))}
+                                        type="text"
+                                        inputMode="decimal"
+                                        maxLength={type === "percent" ? 3 : 8}
+                                        value={valueInput}
+                                        onChange={(e) => {
+                                            const val = e.target.value;
+                                            if (val === "" || /^\d*\.?\d*$/.test(val)) {
+                                                setValueInput(val);
+                                                setValue(parseFloat(val) || 0);
+                                            }
+                                        }}
+                                        placeholder="ระบุมูลค่า"
                                         className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg text-sm focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
                                     />
                                 </div>
                                 <div>
                                     <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">ประเภท</label>
-                                    <select
+                                    <Select
                                         value={type}
-                                        onChange={(e) => setType(e.target.value as "percent" | "amount")}
-                                        className="w-full p-2 border border-[var(--color-coffee-200)] rounded-lg text-sm bg-white focus:ring-2 focus:ring-[var(--color-primary)] outline-none"
-                                    >
-                                        <option value="percent">% (เปอร์เซ็นต์)</option>
-                                        <option value="amount">฿ (บาท)</option>
-                                    </select>
+                                        onChange={(value) => setType(value as "percent" | "amount")}
+                                        options={[
+                                            { value: "percent", label: "% (เปอร์เซ็นต์)" },
+                                            { value: "amount", label: "฿ (บาท)" }
+                                        ]}
+                                    />
                                 </div>
                             </div>
                             {error && <p className="text-red-500 text-sm">{error}</p>}
