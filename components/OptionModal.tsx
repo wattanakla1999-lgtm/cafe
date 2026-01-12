@@ -54,7 +54,11 @@ export function OptionModal({ item, isOpen, onClose, onConfirm }: OptionModalPro
     };
 
     const handleConfirm = () => {
-        const allOptions = [sweetness];
+        const allOptions: Option[] = [];
+
+        if (item.allowSweetnessSelection) {
+            allOptions.push(sweetness);
+        }
 
         if (item.allowTypeSelection && servingType) {
             allOptions.push({ ...servingType, name: `Type: ${servingType.name}` });

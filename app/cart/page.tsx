@@ -16,6 +16,7 @@ export default function CartPage() {
 
     const [customerName, setCustomerName] = useState("");
     const [note, setNote] = useState("");
+    const [isRedirecting, setIsRedirecting] = useState(false);
 
     const handleConfirm = async () => {
         if (isSubmitting) return;
@@ -23,11 +24,21 @@ export default function CartPage() {
         const orderId = await submitOrder(customerName.trim() || "-", "QR", publicStoreId || undefined, note.trim());
 
         if (orderId) {
+            setIsRedirecting(true);
             router.push(`/receipt?id=${orderId}`);
         } else {
             alert("ไม่สามารถสร้างออเดอร์ได้ กรุณาลองใหม่อีกครั้ง");
         }
     };
+
+    if (isRedirecting) {
+        return (
+            <div className="min-h-screen flex flex-col items-center justify-center bg-[var(--color-background)]">
+                <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-[var(--color-primary)]"></div>
+                <p className="mt-4 text-[var(--color-coffee-700)] font-bold">กำลังดำเนินการ...</p>
+            </div>
+        );
+    }
 
     if (cart.length === 0) {
         return (
