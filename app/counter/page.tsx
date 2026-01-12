@@ -100,12 +100,17 @@ export default function CounterPage() {
         }
     };
 
+    const mobileQueueRef = React.useRef<HTMLButtonElement>(null);
+
     const handleCheckout = async () => {
         if (cart.length === 0) return;
 
         // Animation: Submit Button -> Queue
-        if (queueTargetRef.current && submitButtonRef.current && cart.length > 0) {
-            const targetRect = queueTargetRef.current.getBoundingClientRect();
+        const isMobile = window.innerWidth < 1024;
+        const targetRef = isMobile ? mobileQueueRef : queueTargetRef;
+
+        if (targetRef.current && submitButtonRef.current && cart.length > 0) {
+            const targetRect = targetRef.current.getBoundingClientRect();
             const startRect = submitButtonRef.current.getBoundingClientRect();
             // Use first item image or default
             const src = cart[0].menuItem.image || "https://img.icons8.com/color/48/coffee-to-go.png";
@@ -373,6 +378,7 @@ export default function CounterPage() {
                     </button>
 
                     <button
+                        ref={mobileQueueRef}
                         onClick={() => setActiveTab("queue")}
                         className={`flex flex-col items-center gap-1 p-2 rounded-xl transition-all flex-1 relative ${activeTab === "queue" ? "text-[var(--color-primary)] bg-[var(--color-coffee-50)] shadow-sm scale-105" : "text-[var(--color-coffee-400)] hover:bg-gray-50"} `}
                     >
