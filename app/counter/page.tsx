@@ -16,6 +16,9 @@ import { ProtectedRoute } from "../../components/ProtectedRoute";
 
 
 import { FlyingItem } from "../../components/FlyingItem";
+import { supabase } from "../../lib/supabase";
+import { subDays } from "date-fns";
+import { useAuth } from "../../context/AuthContext";
 
 export default function CounterPage() {
     const { menuItems, categories: contextCategories, discounts } = useMenu();
@@ -32,6 +35,10 @@ export default function CounterPage() {
     const [activeTab, setActiveTab] = useState<"menu" | "cart" | "queue">("menu");
 
     const { addToCart, cart, removeFromCart, clearCart, submitOrder, orders, selectedDiscount, setDiscount, isSubmitting, incomingOrder, setIncomingOrder } = useOrder();
+    const { user } = useAuth();
+
+    // Best Seller State
+    const [bestSellers, setBestSellers] = useState<Map<string, number>>(new Map());
 
     // Animation States
     const [flyingItems, setFlyingItems] = useState<{ id: number; src: string; startRect: DOMRect; targetRect: DOMRect }[]>([]);
@@ -44,10 +51,87 @@ export default function CounterPage() {
     // Categories for filter
     const categories = useMemo(() => ["All", ...contextCategories], [contextCategories]);
 
-    const filteredItems = menuItems.filter(item =>
-        (activeCategory === "All" || item.category === activeCategory) &&
-        item.available !== false
-    );
+    // Fetch Best Sellers (Top 10 for counter page)
+    React.useEffect(() => {
+        const fetchBestSellers = async () => {
+            if (!user?.storeId) return;
+
+            try {
+                const thirtyDaysAgo = subDays(new Date(), 30).toISOString();
+
+                const { data: orderItems, error } = await supabase
+                    .from("order_items")
+                    .select(`
+                        menu_item_id,
+                        quantity,
+                        order:orders!inner(
+                            status,
+                            store_id,
+                            created_at
+                        )
+                    `)
+                    .eq("order.store_id", user.storeId)
+                    .gte("order.created_at", thirtyDaysAgo)
+                    .in("order.status", ["completed", "pending", "cooking", "ready"]);
+
+                if (error) throw error;
+
+                const salesMap = new Map<string, number>();
+                orderItems?.forEach((item: any) => {
+                    const itemId = item.menu_item_id;
+                    if (itemId) {
+                        const existing = salesMap.get(itemId);
+                        salesMap.set(itemId, (existing || 0) + (item.quantity || 0));
+                    }
+                });
+
+                setBestSellers(salesMap);
+            } catch (error) {
+                console.error("Error fetching best sellers:", error);
+            }
+        };
+
+        fetchBestSellers();
+    }, [user?.storeId]);
+
+    // Calculate best seller rankings
+    const bestSellerRankings = useMemo(() => {
+        const sorted = Array.from(bestSellers.entries())
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 10);
+        const rankings = new Map<string, number>();
+        sorted.forEach(([id], index) => {
+            rankings.set(id, index + 1);
+        });
+        return rankings;
+    }, [bestSellers]);
+
+    // Sort filtered items: Best Sellers first (by rank), then Recommended, then others
+    const sortedFilteredItems = useMemo(() => {
+        return [...menuItems]
+            .filter(item =>
+                (activeCategory === "All" || item.category === activeCategory) &&
+                item.available !== false
+            )
+            .sort((a, b) => {
+                const aRank = bestSellerRankings.get(a.id) || 999;
+                const bRank = bestSellerRankings.get(b.id) || 999;
+
+                // Priority 1: Best sellers by ranking
+                if (aRank !== bRank) return aRank - bRank;
+
+                // Priority 2: If both are NOT best sellers, recommended items come first
+                if (aRank === 999 && bRank === 999) {
+                    if (a.isRecommended && !b.isRecommended) return -1;
+                    if (!a.isRecommended && b.isRecommended) return 1;
+                }
+
+                // Default: alphabetical by name
+                return a.name.localeCompare(b.name, 'th');
+            });
+    }, [menuItems, activeCategory, bestSellerRankings]);
+
+    const filteredItems = sortedFilteredItems;
 
     const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
@@ -61,7 +145,29 @@ export default function CounterPage() {
         }
         if (discountAmount > subtotal) discountAmount = subtotal;
     }
-    const finalTotal = subtotal - discountAmount;
+
+    const afterDiscount = subtotal - discountAmount;
+
+    // VAT Logic
+    let vatAmount = 0;
+    let finalTotal = afterDiscount;
+    let beforeVat = afterDiscount;
+
+    const taxType = user?.taxType || 'none';
+    const vatRate = user?.vatRate || 7;
+
+    if (taxType === 'include') {
+        beforeVat = afterDiscount / (1 + vatRate / 100);
+        vatAmount = afterDiscount - beforeVat;
+    } else if (taxType === 'exclude') {
+        beforeVat = afterDiscount;
+        vatAmount = afterDiscount * (vatRate / 100);
+        finalTotal = afterDiscount + vatAmount;
+    } else {
+        beforeVat = afterDiscount;
+        vatAmount = 0;
+        finalTotal = afterDiscount;
+    }
 
     // Calculate pending orders for badge
     const pendingCount = orders.filter(o => o.status === "pending").length;
@@ -197,13 +303,19 @@ export default function CounterPage() {
                     {/* Grid Scroll Area */}
                     <div className="flex-1 overflow-y-auto p-4 pb-20 lg:pb-4">
                         <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-2 xl:grid-cols-3 2xl:grid-cols-4 gap-4">
-                            {filteredItems.map((item) => (
-                                <DrinkCard
-                                    key={item.id}
-                                    item={item}
-                                    onClick={() => handleItemClick(item)}
-                                />
-                            ))}
+                            {filteredItems.map((item) => {
+                                const bestSellerRank = bestSellerRankings.get(item.id);
+                                return (
+                                    <DrinkCard
+                                        key={item.id}
+                                        item={item}
+                                        onClick={() => handleItemClick(item)}
+                                        showRecommendedBadge={item.isRecommended}
+                                        showBestSellerBadge={!!bestSellerRank}
+                                        bestSellerRank={bestSellerRank}
+                                    />
+                                );
+                            })}
                         </div>
                     </div>
                 </div>
@@ -322,6 +434,14 @@ export default function CounterPage() {
                                     <span>-฿{Math.floor(discountAmount)}</span>
                                 </div>
                             )}
+
+                            {taxType !== 'none' && (
+                                <div className="flex justify-between items-center text-[10px] lg:text-xs text-[var(--color-coffee-500)]">
+                                    <span>{taxType === 'include' ? `รวม VAT ${vatRate}%` : `VAT ${vatRate}%`}</span>
+                                    <span>฿{vatAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                </div>
+                            )}
+
                             <div className="flex justify-between items-center text-base lg:text-xl font-bold text-[var(--color-coffee-900)] pt-0.5 lg:pt-2">
                                 <span>ยอดรวม</span>
                                 <span>฿{Math.floor(finalTotal)}</span>

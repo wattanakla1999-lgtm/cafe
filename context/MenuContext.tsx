@@ -37,6 +37,7 @@ interface MenuContextType {
     isLoading: boolean;
     setPublicStoreId: (id: string | null) => void;
     publicStoreId: string | null;
+    storeSettings: { address?: string; taxType?: 'none' | 'include' | 'exclude'; vatRate?: number } | null;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
@@ -50,6 +51,9 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     const [servingTypes, setServingTypes] = useState<Option[]>([]);
     const [isLoading, setIsLoading] = useState(true);
     const [publicStoreId, setPublicStoreId] = useState<string | null>(null);
+
+    // --- Store Settings ---
+    const [storeSettings, setStoreSettings] = useState<{ address?: string, taxType?: 'none' | 'include' | 'exclude', vatRate?: number } | null>(null);
 
     const fetchMenuData = useCallback(async () => {
         // Wait for auth to settle to avoid unnecessary public fallback fetches
@@ -81,7 +85,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             }
 
             // Parallel Data Fetching
-            const [categoriesRes, toppingsRes, menuRes, servingTypesRes, discountsRes] = await Promise.all([
+            const [categoriesRes, toppingsRes, menuRes, servingTypesRes, discountsRes, storeRes] = await Promise.all([
                 // 1. Categories
                 supabase
                     .from("categories")
@@ -99,7 +103,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 supabase
                     .from("menu_items")
                     .select(`
-                        id, name, price, description, image, available, allowed_toppings, allow_type_selection, allow_bean_selection, allow_sweetness_selection,
+                        id, name, price, description, image, available, allowed_toppings, allow_type_selection, allow_bean_selection, allow_sweetness_selection, is_recommended,
                         category:categories(name)
                     `)
                     .eq("store_id", targetStoreId),
@@ -115,7 +119,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 supabase
                     .from("discounts")
                     .select("id, name, value, type, active")
-                    .eq("store_id", targetStoreId)
+                    .eq("store_id", targetStoreId),
+
+                // 6. Store Settings
+                supabase
+                    .from("stores")
+                    .select("address, tax_type, vat_rate")
+                    .eq("id", targetStoreId)
+                    .single()
             ]);
 
             // Process Results
@@ -135,6 +146,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 setDiscounts(discountsRes.data);
             }
 
+            if (storeRes.data) {
+                setStoreSettings({
+                    address: storeRes.data.address,
+                    taxType: storeRes.data.tax_type as any,
+                    vatRate: storeRes.data.vat_rate
+                });
+            }
+
             if (menuRes.data) {
                 const mappedItems: MenuItem[] = menuRes.data.map((item: any) => ({
                     id: item.id,
@@ -147,7 +166,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                     allowedToppings: item.allowed_toppings,
                     allowTypeSelection: item.allow_type_selection,
                     allowBeanSelection: item.allow_bean_selection,
-                    allowSweetnessSelection: item.allow_sweetness_selection
+                    allowSweetnessSelection: item.allow_sweetness_selection,
+                    isRecommended: item.is_recommended || false
                 }));
                 setMenuItems(mappedItems);
             }
@@ -162,6 +182,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     useEffect(() => {
         fetchMenuData();
     }, [fetchMenuData]);
+
+
 
     // --- Discounts ---
     const addDiscount = async (discount: Omit<Discount, "id">) => {
@@ -391,7 +413,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 allowed_toppings: item.allowedToppings || [],
                 allow_type_selection: item.allowTypeSelection || false,
                 allow_bean_selection: item.allowBeanSelection || false,
-                allow_sweetness_selection: item.allowSweetnessSelection || false
+                allow_sweetness_selection: item.allowSweetnessSelection || false,
+                is_recommended: item.isRecommended || false
             }]);
             await fetchMenuData();
         } finally {
@@ -418,6 +441,7 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             if (updates.allowTypeSelection !== undefined) dbUpdates.allow_type_selection = updates.allowTypeSelection;
             if (updates.allowBeanSelection !== undefined) dbUpdates.allow_bean_selection = updates.allowBeanSelection;
             if (updates.allowSweetnessSelection !== undefined) dbUpdates.allow_sweetness_selection = updates.allowSweetnessSelection;
+            if (updates.isRecommended !== undefined) dbUpdates.is_recommended = updates.isRecommended;
 
             // Handle category update
             if (updates.category) {
@@ -536,7 +560,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             deleteServingType,
             isLoading,
             setPublicStoreId,
-            publicStoreId
+            publicStoreId,
+            storeSettings
         }}>
             {children}
         </MenuContext.Provider>

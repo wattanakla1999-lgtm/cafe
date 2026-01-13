@@ -9,17 +9,20 @@ export interface User {
     email: string;
     storeName: string;
     storeId: string;
+    address?: string | null;
+    taxType?: 'none' | 'include' | 'exclude';
+    vatRate?: number;
     storeImage?: string | null;
-    accessToken: string; // Added for direct REST API calls
+    accessToken?: string;
 }
 
 interface AuthContextType {
     user: User | null;
     isLoading: boolean;
     login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
-    register: (storeName: string, name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
+    register: (storeName: string, name: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
-    updateUser: (updates: Partial<User>) => void;
+    updateStoreSettings: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
     isAuthenticated: boolean;
 }
 
@@ -33,15 +36,14 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
     // Track ongoing profile fetch promise to prevent race conditions and deduplicate requests
     const profileFetchPromiseRef = React.useRef<Promise<User | null> | null>(null);
 
-    // Fetch user profile from stores table (using direct fetch to avoid client state issues)
+
     // Fetch user profile from stores table (using direct fetch to avoid client state issues)
     const loadStoreProfile = async (
         authUser: SupabaseUser,
         accessToken: string
     ): Promise<User | null> => {
-        // REQUEST DEDUPLICATION: If a fetch is already in progress, return that promise
+        // REQUEST DEDUPLICATION
         if (profileFetchPromiseRef.current) {
-            console.log(`[Profile] ♻️ Reusing existing profile fetch promise for ${authUser.id}`);
             return profileFetchPromiseRef.current;
         }
 
@@ -55,7 +57,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
 
                     const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
                     const response = await fetch(
-                        `${supabaseUrl}/rest/v1/stores?user_id=eq.${authUser.id}&select=id,name`,
+                        `${supabaseUrl}/rest/v1/stores?user_id=eq.${authUser.id}&select=id,name,address,tax_type,vat_rate,store_image`,
                         {
                             method: 'GET',
                             headers: {
@@ -67,19 +69,17 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     );
 
                     if (!response.ok) {
-                        // 5xx errors should be retried, 4xx (except 429) usually fatal
                         if (response.status >= 500 || response.status === 429) {
                             throw new Error(`Server error: ${response.status}`);
                         }
-                        console.error(`[Profile] ❌ Fetch failed: ${response.status} ${response.statusText}`);
-                        return null; // Fatal error (e.g. 401, 403)
+                        console.error(`[Profile] ❌ Fetch failed: ${response.status}`);
+                        return null;
                     }
 
                     const stores = await response.json();
 
                     if (!stores || stores.length === 0) {
-                        // Store not found. Might be latency in replication? Retry.
-                        console.warn(`[Profile] ⏳ Store not found yet, retrying... (${retryCount + 1}/${maxRetries})`);
+                        console.warn(`[Profile] ⏳ Store not found yet, retrying...`);
                         retryCount++;
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         continue;
@@ -92,15 +92,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         email: authUser.email!,
                         storeName: store.name || "Unknown Store",
                         storeId: store.id,
-                        accessToken: accessToken
+                        accessToken: accessToken,
+                        address: store.address,
+                        taxType: store.tax_type as 'none' | 'include' | 'exclude',
+                        vatRate: store.vat_rate,
+                        storeImage: store.store_image
                     };
 
                     console.log("[Profile] ✅ Success:", profile.email);
                     return profile;
 
                 } catch (error: any) {
-                    console.error(`[Profile] ❌ Exception (Attempt ${retryCount + 1}):`, error);
-                    // Check if we should retry (e.g. network error)
+                    console.error(`[Profile] ❌ Exception:`, error);
                     if (retryCount < maxRetries - 1) {
                         retryCount++;
                         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -109,8 +112,6 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     return null;
                 }
             }
-
-            console.error("[Profile] ❌ Failed after max retries");
             return null;
         };
 
@@ -121,6 +122,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         profileFetchPromiseRef.current = fetchPromise;
         return fetchPromise;
     };
+
 
     // Initialize session via listener mostly
     // Initialize session
@@ -265,6 +267,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         storeName: string,
         name: string,
         email: string,
+        phone: string,
         password: string
     ) => {
         try {
@@ -275,6 +278,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     data: {
                         full_name: name,
                         store_name: storeName,
+                        phone: phone,
                     },
                     emailRedirectTo: `${window.location.origin}/login`
                 }
@@ -311,9 +315,39 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
-    const updateUser = (updates: Partial<User>) => {
-        if (user) {
-            setUser({ ...user, ...updates });
+    const updateStoreSettings = async (updates: Partial<User>): Promise<{ success: boolean; error?: string }> => {
+        if (!user?.storeId) return { success: false, error: "No store ID found" };
+
+        try {
+            console.log("[Auth] Updating store settings...", updates);
+
+            // Map camelCase to snake_case for DB
+            const dbUpdates: any = {};
+            if (updates.storeName !== undefined) dbUpdates.name = updates.storeName;
+            if (updates.address !== undefined) dbUpdates.address = updates.address;
+            if (updates.taxType !== undefined) dbUpdates.tax_type = updates.taxType;
+            if (updates.vatRate !== undefined) dbUpdates.vat_rate = updates.vatRate;
+            if (updates.storeImage !== undefined) dbUpdates.store_image = updates.storeImage;
+
+            const { error } = await supabase
+                .from('stores')
+                .update(dbUpdates)
+                .eq('id', user.storeId);
+
+            if (error) {
+                console.error("[Auth] Update failed:", error);
+                return { success: false, error: error.message };
+            }
+
+            // Update local state and cache
+            const newUser = { ...user, ...updates };
+            setUser(newUser);
+            localStorage.setItem('cafe_user', JSON.stringify(newUser));
+
+            return { success: true };
+        } catch (error: any) {
+            console.error("[Auth] Update exception:", error);
+            return { success: false, error: error.message };
         }
     };
 
@@ -325,7 +359,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 login,
                 register,
                 logout,
-                updateUser,
+                updateStoreSettings,
                 isAuthenticated: !!user
             }}
         >

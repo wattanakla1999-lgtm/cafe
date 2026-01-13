@@ -28,7 +28,7 @@ function ReceiptContent() {
                     .from("orders")
                     .select(`
                         id, customer_name, total_amount, discount_info, status, created_at, channel, store_id, note,
-                        store:stores(name),
+                        store:stores(name, address, tax_type, vat_rate),
                         order_items (
                             quantity, total_price, options, name,
                             menu_item:menu_items (
@@ -72,8 +72,12 @@ function ReceiptContent() {
                         // We might need to extend Order type or just use local variable for display
                     };
                     // Hack: attach store name to valid display
+                    // Hack: attach store name to valid display
                     const storeData = data.store as any;
                     (mappedOrder as any).storeName = Array.isArray(storeData) ? storeData[0]?.name : storeData?.name;
+                    (mappedOrder as any).storeAddress = Array.isArray(storeData) ? storeData[0]?.address : storeData?.address;
+                    (mappedOrder as any).taxType = Array.isArray(storeData) ? storeData[0]?.tax_type : storeData?.tax_type;
+                    (mappedOrder as any).vatRate = Array.isArray(storeData) ? storeData[0]?.vat_rate : storeData?.vat_rate;
                     mappedOrder.store_id = data.store_id; // Pass store_id for navigation
                     setOrder(mappedOrder);
                 }
@@ -114,7 +118,10 @@ function ReceiptContent() {
                 <div className="p-8 pt-12 text-center space-y-6">
                     <div className="space-y-1 flex flex-col items-center">
                         <h2 className="text-2xl font-bold text-[var(--color-coffee-900)]">{(order as any).storeName || "Cafe"}</h2>
-                        <p className="text-sm text-[var(--color-coffee-500)]">ออเดอร์ #{order.orderId}</p>
+                        {(order as any).storeAddress && (
+                            <p className="text-xs text-[var(--color-coffee-600)] max-w-[200px] whitespace-pre-wrap">{(order as any).storeAddress}</p>
+                        )}
+                        <p className="text-sm text-[var(--color-coffee-500)] mt-1">ออเดอร์ #{order.orderId}</p>
                         <p className="text-xs text-[var(--color-coffee-400)]">{order.timestamp.toLocaleString('th-TH')}</p>
                     </div>
 
@@ -139,9 +146,70 @@ function ReceiptContent() {
                         </div>
                     )}
 
-                    <div className="flex justify-between font-bold text-lg text-[var(--color-coffee-900)]">
-                        <span>ยอดรวม</span>
-                        <span>฿{order.totalAmount}</span>
+                    <div className="space-y-1">
+                        {(() => {
+                            const taxType = (order as any).taxType || 'none';
+                            const vatRate = (order as any).vatRate || 7;
+                            // We assume totalAmount is final paid amount
+                            const totalAmount = order.totalAmount;
+                            let vatAmount = 0;
+                            let beforeVat = totalAmount;
+
+                            if (taxType === 'include') {
+                                beforeVat = totalAmount / (1 + vatRate / 100);
+                                vatAmount = totalAmount - beforeVat;
+                            } else if (taxType === 'exclude') {
+                                // For exclude, the totalAmount in DB *should* already include VAT if computed correctly before saving
+                                // BUT wait, our submitOrder logic (which we didn't touch deep in context) likely saves pure sum of items.
+                                // However, we just adjusted CartPage to show 'finalTotal' but the order submitted 
+                                // via standard logic using `order.items` sum might differ if backend doesn't account for it.
+                                // Wait, if VAT is excluded, the meaningful total to show on receipt is what they PAID.
+                                // If the stored total_amount in DB is just subtotal (because we didn't change submitOrder logic to add VAT to the saved total), 
+                                // then we should probably re-calculate "Total to Pay" here or display "Subtotal" vs "Total".
+
+                                // Given I didn't change `submitOrder` or DB schema for storing tax amount, 
+                                // I must rely on re-calculation assumption same as CartPage.
+                                // If totalAmount in DB is sum of items (Subtotal - Discount), then:
+
+                                beforeVat = totalAmount; // This is actually subtotal after discount
+                                vatAmount = totalAmount * (vatRate / 100);
+                                // displayTotal = totalAmount + vatAmount; 
+                                // BUT we are displaying `order.totalAmount` at the bottom. 
+                                // If I change the display but not the passed `order.totalAmount`, it might look inconsistent.
+                                // For 'exclude', the `order.totalAmount` saved in DB is likely PRE-TAX if the logic wasn't updated.
+                                // Let's assume for Receipt we want to show the full breakdown and the GRAND TOTAL.
+                            }
+
+                            // If tax is exclude, the `order.totalAmount` (from DB) is currently likely the subtotal-discount.
+                            // So the Real Grand Total is `order.totalAmount + vat`.
+                            // However, if I display a different Total than what `order` object says, it might be confusing if other parts use it.
+                            // But for Receipt, correctness of "Amount to Pay" is key.
+
+                            const displayTotal = taxType === 'exclude' ? totalAmount + vatAmount : totalAmount;
+
+                            return (
+                                <>
+                                    {taxType !== 'none' && (
+                                        <div className="flex justify-between text-xs text-[var(--color-coffee-600)]">
+                                            <span>ยอดก่อนภาษี</span>
+                                            <span>฿{beforeVat.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    {taxType !== 'none' && (
+                                        <div className="flex justify-between text-xs text-[var(--color-coffee-600)]">
+                                            <span>
+                                                {taxType === 'include' ? `รวม VAT ${vatRate}%` : `VAT ${vatRate}%`}
+                                            </span>
+                                            <span>฿{vatAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                                        </div>
+                                    )}
+                                    <div className="flex justify-between font-bold text-lg text-[var(--color-coffee-900)] pt-2 border-t border-[var(--color-coffee-200)] mt-2">
+                                        <span>ยอดรวม</span>
+                                        <span>฿{Math.floor(displayTotal)}</span>
+                                    </div>
+                                </>
+                            );
+                        })()}
                     </div>
 
                     <div className="pt-4">

@@ -14,10 +14,12 @@ export default function RegisterPage() {
     const [storeName, setStoreName] = useState("");
     const [name, setName] = useState("");
     const [email, setEmail] = useState("");
+    const [phone, setPhone] = useState("");
     const [password, setPassword] = useState("");
     const [confirmPassword, setConfirmPassword] = useState("");
     const [isLoading, setIsLoading] = useState(false);
     const [error, setError] = useState("");
+    const [showSuccessPopup, setShowSuccessPopup] = useState(false);
 
     const handleRegister = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -36,16 +38,25 @@ export default function RegisterPage() {
             return;
         }
 
+        // Validate phone number (Thai format: 10 digits starting with 0)
+        const phoneRegex = /^0[0-9]{9}$/;
+        if (!phoneRegex.test(phone)) {
+            setError("กรุณากรอกเบอร์โทรศัพท์ให้ถูกต้อง (10 หลัก ขึ้นต้นด้วย 0)");
+            return;
+        }
+
         setIsLoading(true);
 
         try {
             // Security: Sanitize inputs
             const safeStoreName = sanitizeInput(storeName);
             const safeName = sanitizeInput(name);
+            const safePhone = sanitizeInput(phone);
 
-            const result = await register(safeStoreName, safeName, email, password);
+            const result = await register(safeStoreName, safeName, email, safePhone, password);
             if (result.success) {
-                router.push("/");
+                setIsLoading(false);
+                setShowSuccessPopup(true);
             } else {
                 setError(result.error || "Registration failed");
                 setIsLoading(false);
@@ -108,6 +119,19 @@ export default function RegisterPage() {
                             onChange={(e) => setEmail(e.target.value)}
                             className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                             placeholder="owner@example.com"
+                        />
+                    </div>
+
+                    <div>
+                        <label className="block text-sm font-bold text-[var(--color-coffee-700)] mb-1">เบอร์โทรศัพท์</label>
+                        <input
+                            type="tel"
+                            required
+                            maxLength={10}
+                            value={phone}
+                            onChange={(e) => setPhone(e.target.value.replace(/[^0-9]/g, ''))}
+                            className="w-full p-3 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
+                            placeholder="0812345678"
                         />
                     </div>
 
@@ -182,6 +206,43 @@ export default function RegisterPage() {
                     </Link>
                 </div>
             </div>
+
+            {/* Email Confirmation Popup */}
+            {showSuccessPopup && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
+                    <div className="bg-white rounded-2xl shadow-2xl p-8 max-w-md w-full animate-scale-up">
+                        <div className="text-center">
+                            {/* Success Icon */}
+                            <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
+                                <svg className="w-8 h-8 text-green-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 13l4 4L19 7" />
+                                </svg>
+                            </div>
+
+                            <h2 className="text-2xl font-bold text-[var(--color-coffee-900)] mb-3">
+                                ลงทะเบียนสำเร็จ!
+                            </h2>
+
+                            <p className="text-[var(--color-coffee-600)] mb-6 leading-relaxed">
+                                กรุณาไปกดยืนยันที่อีเมลของท่าน<br />
+                                เพื่อเข้าใช้งานระบบ
+                            </p>
+
+                            <Button
+                                onClick={() => {
+                                    setShowSuccessPopup(false);
+                                    router.push("/login");
+                                }}
+                                fullWidth
+                                size="lg"
+                                className="shadow-lg shadow-orange-200"
+                            >
+                                รับทราบ
+                            </Button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 }

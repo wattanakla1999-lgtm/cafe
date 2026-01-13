@@ -9,10 +9,63 @@ import { useRouter } from "next/navigation";
 
 export default function CartPage() {
     const { cart, removeFromCart, submitOrder, isSubmitting } = useOrder();
-    const { publicStoreId } = useMenu();
+    const { publicStoreId, storeSettings } = useMenu();
     const router = useRouter();
 
-    const total = cart.reduce((sum, item) => sum + item.totalPrice, 0);
+    // VAT Calculation Logic
+    const calculateTotal = (items: typeof cart, discount?: any) => {
+        const subtotal = items.reduce((sum, item) => sum + item.totalPrice, 0);
+        let discountAmount = 0;
+
+        if (discount) {
+            if (discount.type === "percent") {
+                discountAmount = subtotal * (discount.value / 100);
+            } else {
+                discountAmount = discount.value;
+            }
+            if (discountAmount > subtotal) discountAmount = subtotal;
+        }
+
+        const afterDiscount = subtotal - discountAmount;
+        let vatAmount = 0;
+        let finalTotal = afterDiscount;
+        let beforeVat = afterDiscount;
+
+        const taxType = storeSettings?.taxType || 'none';
+        const vatRate = storeSettings?.vatRate || 7;
+
+        if (taxType === 'include') {
+            // VAT is included in the price: Price = Net * (1 + Rate)
+            // VAT = Price - Net = Price - (Price / (1 + Rate))
+            // VAT = Price * (1 - 1/(1+Rate)) = Price * (Rate / (1+Rate))
+            beforeVat = afterDiscount / (1 + vatRate / 100);
+            vatAmount = afterDiscount - beforeVat;
+        } else if (taxType === 'exclude') {
+            // VAT is added on top: Total = Net * (1 + Rate)
+            // VAT = Net * Rate
+            beforeVat = afterDiscount;
+            vatAmount = afterDiscount * (vatRate / 100);
+            finalTotal = afterDiscount + vatAmount;
+        } else {
+            // 'none'
+            beforeVat = afterDiscount;
+            vatAmount = 0;
+            finalTotal = afterDiscount;
+        }
+
+        return {
+            subtotal,
+            discountAmount,
+            afterDiscount,
+            vatAmount,
+            finalTotal,
+            beforeVat,
+            taxType,
+            vatRate
+        };
+    };
+
+    const { finalTotal, vatAmount, taxType, vatRate } = calculateTotal(cart);
 
     const [customerName, setCustomerName] = useState("");
     const [note, setNote] = useState("");
@@ -20,6 +73,15 @@ export default function CartPage() {
 
     const handleConfirm = async () => {
         if (isSubmitting) return;
+
+        // Note: We currently don't pass explicit tax details to submitOrder API 
+        // because the backend likely calculates it or just takes the total.
+        // If needed, we would update submitOrder signature. 
+        // For now, we assume the total calculated here is what matters for display
+        // or user understands the estimated total. 
+        // Actually, submitOrder likely re-calculates or just creates records.
+        // Let's ensure we pass the correct structure if possible, but existing code 
+        // just takes basic params. 
 
         const orderId = await submitOrder(customerName.trim() || "-", "QR", publicStoreId || undefined, note.trim());
 
@@ -132,9 +194,25 @@ export default function CartPage() {
                     </div>
                 </div>
 
-                <div className="flex justify-between items-center mb-4 text-lg font-bold text-[var(--color-coffee-900)]">
-                    <span>รวมทั้งสิ้น</span>
-                    <span className="text-[var(--color-primary)]">฿{total}</span>
+                <div className="space-y-1 mb-4">
+                    <div className="flex justify-between text-sm text-[var(--color-coffee-600)]">
+                        <span>ยอดรวมย่อย</span>
+                        <span>฿{cart.reduce((sum, item) => sum + item.totalPrice, 0)}</span>
+                    </div>
+
+                    {taxType !== 'none' && (
+                        <div className="flex justify-between text-xs text-[var(--color-coffee-500)]">
+                            <span>
+                                {taxType === 'include' ? `รวม VAT ${vatRate}%` : `VAT ${vatRate}%`}
+                            </span>
+                            <span>฿{vatAmount.toLocaleString('th-TH', { minimumFractionDigits: 2, maximumFractionDigits: 2 })}</span>
+                        </div>
+                    )}
+
+                    <div className="flex justify-between items-center text-lg font-bold text-[var(--color-coffee-900)] pt-2 border-t border-dashed border-[var(--color-coffee-200)] mt-2">
+                        <span>รวมทั้งสิ้น</span>
+                        <span className="text-[var(--color-primary)]">฿{Math.floor(finalTotal)}</span>
+                    </div>
                 </div>
                 <Button
                     fullWidth

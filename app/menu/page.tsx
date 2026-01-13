@@ -9,13 +9,15 @@ import { FlyingItem } from "../../components/FlyingItem";
 import Link from "next/link";
 import { MenuItem, Option } from "../../data/mock";
 import { useMenu } from "../../context/MenuContext";
+import { RecommendedSection } from "../../components/menu/RecommendedSection";
+import { BestSellerSection } from "../../components/menu/BestSellerSection";
 
 import { useSearchParams } from "next/navigation";
 
 import { Suspense } from "react";
 
 function MenuContent() {
-    const { menuItems, categories: contextCategories, setPublicStoreId } = useMenu();
+    const { menuItems, categories: contextCategories, setPublicStoreId, publicStoreId } = useMenu();
     const searchParams = useSearchParams();
     const storeId = searchParams.get("storeId");
 
@@ -109,6 +111,12 @@ function MenuContent() {
                     </Link>
                 </div>
             </div>
+
+            {/* Recommended Menu Section */}
+            <RecommendedSection items={menuItems} onItemClick={handleItemClick} />
+
+            {/* Best Seller Section */}
+            <BestSellerSection items={menuItems} onItemClick={handleItemClick} storeId={publicStoreId} />
 
             {/* Category Tabs */}
             <div className="p-4 overflow-x-auto whitespace-nowrap hide-scrollbar flex space-x-2">
