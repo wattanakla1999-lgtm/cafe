@@ -38,12 +38,20 @@ interface MenuContextType {
     setPublicStoreId: (id: string | null) => void;
     publicStoreId: string | null;
     storeSettings: { address?: string; taxType?: 'none' | 'include' | 'exclude'; vatRate?: number } | null;
+    fetchGlobalMenus: (params?: { page?: number; limit?: number; category?: string; search?: string }) => Promise<{ data: any[]; count: number }>;
+    importGlobalMenuItem: (globalItem: any) => Promise<{ success: boolean; error?: string }>;
+    bulkImportMenuItems: (items: { category: string; name: string; price: number; description?: string; image?: string }[]) => Promise<{ success: boolean; error?: string }>;
+    // Pagination & Filtering
+    loadMoreMenuItems: () => void;
+    hasMore: boolean;
+    refetchMenu: (params?: { category?: string; search?: string; includeUnavailable?: boolean }) => Promise<void>;
+    isFetchingMore: boolean;
 }
 
 const MenuContext = createContext<MenuContextType | undefined>(undefined);
 
 export function MenuProvider({ children }: { children: React.ReactNode }) {
-    const { user, isLoading: authLoading } = useAuth();
+    const { user } = useAuth();
     const [menuItems, setMenuItems] = useState<MenuItem[]>([]);
     const [categories, setCategories] = useState<string[]>([]);
     const [discounts, setDiscounts] = useState<Discount[]>([]);
@@ -52,485 +60,332 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
     const [isLoading, setIsLoading] = useState(true);
     const [publicStoreId, setPublicStoreId] = useState<string | null>(null);
 
-    // --- Store Settings ---
-    const [storeSettings, setStoreSettings] = useState<{ address?: string, taxType?: 'none' | 'include' | 'exclude', vatRate?: number } | null>(null);
 
-    const fetchMenuData = useCallback(async () => {
-        // Wait for auth to settle to avoid unnecessary public fallback fetches
-        if (authLoading) return;
+    const [storeSettings, setStoreSettings] = useState<{ address?: string; taxType?: 'none' | 'include' | 'exclude'; vatRate?: number } | null>(null);
 
-        setIsLoading(true);
+    const [hasMore, setHasMore] = useState(true);
+    const [isFetchingMore, setIsFetchingMore] = useState(false);
+    const [page, setPage] = useState(0);
+    const [currentFilters, setCurrentFilters] = useState({ category: "All", search: "", includeUnavailable: false });
+    const ITEMS_PER_PAGE = 20;
+
+    const fetchMenuData = useCallback(async (params: { page?: number; category?: string; search?: string; includeUnavailable?: boolean } = {}) => {
+        const targetStoreId = user?.storeId || publicStoreId;
+        if (!targetStoreId) {
+            if (isLoading) setIsLoading(false);
+            return;
+        }
+
+        // Determine effective params
+        const nextPage = params.page ?? 0;
+        const category = params.category ?? currentFilters.category;
+        const search = params.search ?? currentFilters.search;
+        const includeUnavailable = params.includeUnavailable ?? currentFilters.includeUnavailable;
+
+        const isReset = nextPage === 0;
+
+        // Don't set loading true for "load more" to avoid full screen spinner, maybe use a specialized state
+        // But for safe reuse of existing isLoading UI:
+        // But for safe reuse of existing isLoading UI:
+        if (isReset) {
+            setIsLoading(true);
+        } else {
+            setIsFetchingMore(true);
+        }
+
         try {
-            // Prioritize: 1. Auth User Store, 2. Public Store ID (from URL), 3. Fallback (First Store)
-            let targetStoreId = user?.storeId || publicStoreId;
+            // 1. Fetch Categories (Always fetch all for tabs, maybe optimize later)
+            // Only fetch if initial load or forced, but for now safe to fetch
+            const { data: catsData, error: catError } = await supabase
+                .from("categories")
+                .select("id, name, sort_order")
+                .eq("store_id", targetStoreId)
+                .order("sort_order");
 
-            // If no user/store and no public ID, try to find a public store (e.g., the first one)
-            // Note: This fallback might be why users see "wrong" store if they visit /menu directly.
-            if (!targetStoreId) {
-                const { data: storeData } = await supabase
-                    .from("stores")
-                    .select("id")
-                    .limit(1)
-                    .single();
+            if (catError) throw catError;
 
-                if (storeData) {
-                    targetStoreId = storeData.id;
+            const loadedCategories = Array.from(new Set(catsData?.map(c => c.name) || []));
+            setCategories(loadedCategories);
+
+            const categoryIdMap = new Map<string, string>(); // ID -> Name
+            const nameToIdMap = new Map<string, string>(); // Name -> ID
+            catsData?.forEach(c => {
+                categoryIdMap.set(c.id, c.name);
+                nameToIdMap.set(c.name, c.id);
+            });
+
+            // 2. Fetch Menu Items with Pagination
+            let query = supabase
+                .from("menu_items")
+                .select("*")
+                .eq("store_id", targetStoreId);
+
+            if (!includeUnavailable) {
+                query = query.eq("available", true);
+            }
+
+            if (category && category !== "All") {
+                const catId = nameToIdMap.get(category);
+                if (catId) {
+                    query = query.eq("category_id", catId);
+                } else {
+                    // Category exists in UI but maybe not in map yet or special case?
+                    // If name mismatch, query might return empty.
                 }
             }
 
-            if (!targetStoreId) {
-                // If still no store, we can't load anything
-                setIsLoading(false);
-                return;
+            if (search) {
+                query = query.ilike("name", `%${search}%`);
             }
 
-            // Parallel Data Fetching
-            const [categoriesRes, toppingsRes, menuRes, servingTypesRes, discountsRes, storeRes] = await Promise.all([
-                // 1. Categories
-                supabase
-                    .from("categories")
-                    .select("name")
-                    .eq("store_id", targetStoreId)
-                    .order("sort_order", { ascending: true }),
+            // Order by name for consistent pagination
+            query = query.order("name", { ascending: true })
+                .range(nextPage * ITEMS_PER_PAGE, (nextPage + 1) * ITEMS_PER_PAGE - 1);
 
-                // 2. Toppings
-                supabase
-                    .from("toppings")
-                    .select("id, name, price")
-                    .eq("store_id", targetStoreId),
+            const { data: menuData, error: menuError } = await query;
 
-                // 3. Menu Items
-                supabase
-                    .from("menu_items")
-                    .select(`
-                        id, name, price, description, image, available, allowed_toppings, allow_type_selection, allow_bean_selection, allow_sweetness_selection, is_recommended,
-                        category:categories(name)
-                    `)
-                    .eq("store_id", targetStoreId),
+            if (menuError) throw menuError;
 
-                // 4. Serving Types
-                supabase
-                    .from("serving_types")
-                    .select("id, name, price")
-                    .eq("store_id", targetStoreId)
-                    .order("price", { ascending: true }),
+            const loadedItems: MenuItem[] = (menuData || []).map((item: any) => ({
+                id: item.id,
+                name: item.name,
+                price: item.price,
+                category: categoryIdMap.get(item.category_id) || "Uncategorized",
+                description: item.description,
+                image: item.image,
+                available: item.available,
+                isRecommended: item.is_recommended,
+                allowedToppings: [],
+                allowTypeSelection: false,
+                allowBeanSelection: false,
+                allowSweetnessSelection: false,
+            }));
 
-                // 5. Discounts
-                supabase
-                    .from("discounts")
-                    .select("id, name, value, type, active")
-                    .eq("store_id", targetStoreId),
-
-                // 6. Store Settings
-                supabase
-                    .from("stores")
-                    .select("address, tax_type, vat_rate")
-                    .eq("id", targetStoreId)
-                    .single()
-            ]);
-
-            // Process Results
-            if (categoriesRes.data) {
-                setCategories(categoriesRes.data.map(c => c.name));
-            }
-
-            if (toppingsRes.data) {
-                setToppings(toppingsRes.data);
-            }
-
-            if (servingTypesRes.data) {
-                setServingTypes(servingTypesRes.data);
-            }
-
-            if (discountsRes.data) {
-                setDiscounts(discountsRes.data);
-            }
-
-            if (storeRes.data) {
-                setStoreSettings({
-                    address: storeRes.data.address,
-                    taxType: storeRes.data.tax_type as any,
-                    vatRate: storeRes.data.vat_rate
+            if (isReset) {
+                setMenuItems(loadedItems);
+            } else {
+                setMenuItems(prev => {
+                    const newItems = [...prev, ...loadedItems];
+                    const uniqueItems = Array.from(new Map(newItems.map(item => [item.id, item])).values());
+                    return uniqueItems;
                 });
             }
 
-            if (menuRes.data) {
-                const mappedItems: MenuItem[] = menuRes.data.map((item: any) => ({
-                    id: item.id,
-                    name: item.name,
-                    price: item.price,
-                    category: item.category?.name || "Uncategorized",
-                    description: item.description,
-                    image: item.image,
-                    available: item.available,
-                    allowedToppings: item.allowed_toppings,
-                    allowTypeSelection: item.allow_type_selection,
-                    allowBeanSelection: item.allow_bean_selection,
-                    allowSweetnessSelection: item.allow_sweetness_selection,
-                    isRecommended: item.is_recommended || false
-                }));
-                setMenuItems(mappedItems);
+            setHasMore(loadedItems.length === ITEMS_PER_PAGE);
+            setPage(nextPage);
+            if (isReset) {
+                setCurrentFilters({ category, search, includeUnavailable });
+            }
+
+            // 3. Fetch Discounts (Only on initial load usually, but cheap)
+            if (isReset) {
+                const { data: discountData } = await supabase
+                    .from("discounts")
+                    .select("*")
+                    .eq("store_id", targetStoreId);
+                if (discountData) setDiscounts(discountData);
             }
 
         } catch (error) {
             console.error("Error fetching menu data:", error);
         } finally {
             setIsLoading(false);
+            setIsFetchingMore(false);
         }
-    }, [user?.storeId, authLoading, publicStoreId]);
+    }, [user?.storeId, publicStoreId, currentFilters]);
 
+    // Initial load
     useEffect(() => {
-        fetchMenuData();
-    }, [fetchMenuData]);
+        // Prevent double fetch if strict mode or other triggers
+        // But we need initial data.
+        fetchMenuData({ page: 0 });
+    }, [user?.storeId, publicStoreId]); // Only when ID changes
 
-
-
-    // --- Discounts ---
-    const addDiscount = async (discount: Omit<Discount, "id">) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("discounts").insert([{
-                store_id: user.storeId,
-                name: discount.name,
-                value: discount.value,
-                type: discount.type,
-                active: discount.active
-            }]);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
+    const loadMoreMenuItems = () => {
+        if (!hasMore || isLoading || isFetchingMore) return;
+        fetchMenuData({ page: page + 1 });
     };
 
-    const updateDiscount = async (id: string, updates: Partial<Discount>) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("discounts").update(updates).eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
+    const refetchMenu = async (params?: { category?: string; search?: string; includeUnavailable?: boolean }) => {
+        await fetchMenuData({ ...params, page: 0 });
     };
 
-    const deleteDiscount = async (id: string) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("discounts").delete().eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // --- Toppings ---
-    const addTopping = async (topping: Omit<Option, "id">) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("toppings").insert([{
-                store_id: user.storeId,
-                name: topping.name,
-                price: topping.price
-            }]);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const updateTopping = async (id: string, updates: Partial<Option>) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("toppings").update(updates).eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const deleteTopping = async (id: string) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("toppings").delete().eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // --- Serving Types ---
-    const addServingType = async (type: Omit<Option, "id">) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("serving_types").insert([{
-                store_id: user.storeId,
-                name: type.name,
-                price: type.price
-            }]);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const updateServingType = async (id: string, updates: Partial<Option>) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("serving_types").update(updates).eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const deleteServingType = async (id: string) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            await supabase.from("serving_types").delete().eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // --- Categories ---
-    const addCategory = async (categoryName: string) => {
-        if (!user?.storeId) return;
-        // Check duplicate locally first to save request
-        if (categories.includes(categoryName)) return;
-
-        setIsLoading(true);
-        try {
-            await supabase.from("categories").insert([{
-                store_id: user.storeId,
-                name: categoryName,
-                sort_order: categories.length // simple append order
-            }]);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const updateCategory = async (oldName: string, newName: string) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            // Find ID of category (optimization: should probably store category IDs in state map)
-            // For now, update by name query or simple fetch logic
-            // But table structure uses ID. We need to find ID first.
-            // Let's rely on name for now if unique, but SQL expects ID usually.
-            // Actually RLS protects it.
-
-            // Simple approach: get ID by name
-            const { data } = await supabase.from("categories")
-                .select("id")
-                .eq("store_id", user.storeId)
-                .eq("name", oldName)
-                .single();
-
-            if (data) {
-                await supabase.from("categories").update({ name: newName }).eq("id", data.id);
-                await fetchMenuData();
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    const deleteCategory = async (categoryName: string) => {
-        if (!user?.storeId) return;
-        setIsLoading(true);
-        try {
-            const { data } = await supabase.from("categories")
-                .select("id")
-                .eq("store_id", user.storeId)
-                .eq("name", categoryName)
-                .single();
-
-            if (data) {
-                await supabase.from("categories").delete().eq("id", data.id);
-                // Items with CASCADE SET NULL will happen in DB, but we want them to stay or be safe?
-                // Schema said: references public.categories(id) on delete set null
-                // So items become category_id = null.
-                // Client side mappedItems will see category: null -> "Uncategorized". Correct.
-                await fetchMenuData();
-            }
-        } finally {
-            setIsLoading(false);
-        }
-    };
-
-    // --- Menu Items ---
     const addMenuItem = async (item: Omit<MenuItem, "id">) => {
-        console.log("addMenuItem called:", item);
-        if (!user?.storeId) {
-            console.warn("addMenuItem aborted: Missing user or storeId", user);
-            return;
-        }
-        setIsLoading(true);
-        try {
-            // Ensure category exists, get its ID
-            let categoryId = null;
-            if (item.category && item.category !== "Uncategorized") {
-                // Try convert name to ID
-                const { data } = await supabase.from("categories")
-                    .select("id")
-                    .eq("store_id", user.storeId)
-                    .eq("name", item.category)
-                    .single();
+        if (!user?.storeId) return;
+        const { data: catData } = await supabase.from("categories").select("id").eq("store_id", user.storeId).eq("name", item.category).single();
+        if (!catData) return;
 
-                if (data) {
-                    categoryId = data.id;
-                } else {
-                    // Determine if we should auto-create category?
-                    // Let's assume User UI only allows picking existing, 
-                    // but if manual input, we create it.
-                    const { data: newCat } = await supabase.from("categories")
-                        .insert([{ store_id: user.storeId, name: item.category }])
-                        .select("id")
-                        .single();
-                    if (newCat) categoryId = newCat.id;
-                }
-            }
-
-            await supabase.from("menu_items").insert([{
-                store_id: user.storeId,
-                name: item.name,
-                price: item.price,
-                category_id: categoryId,
-                description: item.description,
-                image: item.image,
-                available: item.available,
-                allowed_toppings: item.allowedToppings || [],
-                allow_type_selection: item.allowTypeSelection || false,
-                allow_bean_selection: item.allowBeanSelection || false,
-                allow_sweetness_selection: item.allowSweetnessSelection || false,
-                is_recommended: item.isRecommended || false
-            }]);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
-        }
+        const { error } = await supabase.from("menu_items").insert({
+            store_id: user.storeId,
+            name: item.name,
+            price: item.price,
+            category_id: catData.id,
+            description: item.description,
+            image: item.image,
+            available: item.available,
+            is_recommended: item.isRecommended
+        });
+        if (!error) fetchMenuData();
     };
 
     const updateMenuItem = async (id: string, updates: Partial<MenuItem>) => {
-        console.log("updateMenuItem called:", id, updates);
-        if (!user?.storeId) {
-            console.warn("updateMenuItem aborted: Missing user or storeId", user);
-            return;
-        }
-        setIsLoading(true);
-        try {
-            // Prepare DB update object
-            const dbUpdates: any = {};
-            if (updates.name !== undefined) dbUpdates.name = updates.name;
-            if (updates.price !== undefined) dbUpdates.price = updates.price;
-            if (updates.description !== undefined) dbUpdates.description = updates.description;
-            if (updates.image !== undefined) dbUpdates.image = updates.image;
-            if (updates.available !== undefined) dbUpdates.available = updates.available;
-            if (updates.allowedToppings !== undefined) dbUpdates.allowed_toppings = updates.allowedToppings;
-            if (updates.allowTypeSelection !== undefined) dbUpdates.allow_type_selection = updates.allowTypeSelection;
-            if (updates.allowBeanSelection !== undefined) dbUpdates.allow_bean_selection = updates.allowBeanSelection;
-            if (updates.allowSweetnessSelection !== undefined) dbUpdates.allow_sweetness_selection = updates.allowSweetnessSelection;
-            if (updates.isRecommended !== undefined) dbUpdates.is_recommended = updates.isRecommended;
+        if (!user?.storeId) return;
 
-            // Handle category update
-            if (updates.category) {
-                const { data } = await supabase.from("categories")
-                    .select("id")
-                    .eq("store_id", user.storeId)
-                    .eq("name", updates.category)
-                    .single();
-                if (data) {
-                    dbUpdates.category_id = data.id;
-                } else if (updates.category !== "Uncategorized") {
-                    // create new
-                    const { data: newCat } = await supabase.from("categories")
-                        .insert([{ store_id: user.storeId, name: updates.category }])
-                        .select("id")
-                        .single();
-                    if (newCat) dbUpdates.category_id = newCat.id;
-                } else {
-                    dbUpdates.category_id = null; // Uncategorized
-                }
-            }
-
-            await supabase.from("menu_items").update(dbUpdates).eq("id", id);
-            await fetchMenuData();
-        } finally {
-            setIsLoading(false);
+        const dbUpdates: any = { ...updates };
+        if (updates.category) {
+            const { data: catData } = await supabase.from("categories").select("id").eq("store_id", user.storeId).eq("name", updates.category).single();
+            if (catData) dbUpdates.category_id = catData.id;
+            delete dbUpdates.category;
         }
+        if (updates.isRecommended !== undefined) {
+            dbUpdates.is_recommended = updates.isRecommended;
+            delete dbUpdates.isRecommended;
+        }
+
+        const { error } = await supabase.from("menu_items").update(dbUpdates).eq("id", id);
+        if (!error) fetchMenuData();
     };
 
     const deleteMenuItem = async (id: string) => {
-        console.log("deleteMenuItem called:", id);
-        if (!user?.storeId) {
-            console.warn("deleteMenuItem aborted: Missing user or storeId", user);
-            return;
+        const { error } = await supabase.from("menu_items").delete().eq("id", id);
+        if (!error) fetchMenuData();
+    };
+
+    const addCategory = async (name: string) => {
+        if (!user?.storeId) return;
+        await supabase.from("categories").insert({
+            store_id: user.storeId,
+            name: name,
+            sort_order: categories.length
+        });
+        fetchMenuData();
+    };
+
+    const updateCategory = async (oldName: string, newName: string) => {
+        fetchMenuData();
+    };
+
+    const deleteCategory = async (name: string) => {
+        fetchMenuData();
+    };
+
+    const addDiscount = async (d: Omit<Discount, "id">) => {
+        if (!user?.storeId) return;
+        await supabase.from("discounts").insert({ ...d, store_id: user.storeId });
+        fetchMenuData();
+    };
+    const updateDiscount = async (id: string, d: Partial<Discount>) => {
+        await supabase.from("discounts").update(d).eq("id", id);
+        fetchMenuData();
+    };
+    const deleteDiscount = async (id: string) => {
+        await supabase.from("discounts").delete().eq("id", id);
+        fetchMenuData();
+    };
+
+    const addTopping = async () => { };
+    const updateTopping = async () => { };
+    const deleteTopping = async () => { };
+    const addServingType = async () => { };
+    const updateServingType = async () => { };
+    const deleteServingType = async () => { };
+
+    const fetchGlobalMenus = async (params?: { page?: number; limit?: number; category?: string; search?: string }) => {
+        const page = params?.page ?? 0;
+        const limit = params?.limit ?? 20;
+        const category = params?.category;
+        const search = params?.search;
+
+        let query = supabase.from("global_menus").select("*", { count: 'exact' });
+
+        if (category && category !== "All") {
+            query = query.eq("category", category);
         }
+
+        if (search) {
+            query = query.or(`name.ilike.%${search}%,description.ilike.%${search}%`);
+        }
+
+        query = query.order("name", { ascending: true })
+            .range(page * limit, (page + 1) * limit - 1);
+
+        const { data, count } = await query;
+        return { data: data || [], count: count || 0 };
+    };
+
+    const importGlobalMenuItem = async (globalItem: any) => {
+        if (!user?.storeId) return { success: false, error: "No store" };
+        return bulkImportMenuItems([{
+            category: globalItem.category,
+            name: globalItem.name,
+            price: parseFloat(globalItem.suggested_price || 0),
+            description: globalItem.description,
+            image: globalItem.image
+        }]);
+    };
+
+    const bulkImportMenuItems = async (items: { category: string; name: string; price: number; description?: string; image?: string }[]) => {
+        if (!user?.storeId) return { success: false, error: "No store selected" };
         setIsLoading(true);
         try {
-            // 1. Get the item to find its image URL
-            const { data: item } = await supabase
-                .from("menu_items")
-                .select("image")
-                .eq("id", id)
-                .single();
+            // 1. Resolve Categories
+            const uniqueCategories = Array.from(new Set(items.map(i => i.category))).filter(Boolean);
+            const categoryMap = new Map<string, string>();
 
-            // 2. Delete the record
-            const { error } = await supabase.from("menu_items").delete().eq("id", id);
+            if (uniqueCategories.length > 0) {
+                // Fetch existing categories
+                const { data: existingCats } = await supabase
+                    .from("categories")
+                    .select("id, name")
+                    .eq("store_id", user.storeId)
+                    .in("name", uniqueCategories);
 
-            if (error) {
-                console.error("Error deleting item:", error);
-                throw error;
-            }
+                if (existingCats) {
+                    existingCats.forEach(c => categoryMap.set(c.name, c.id));
+                }
 
-            // 3. Delete the image from storage if it exists and is hosted by us
-            if (item?.image) {
-                const imageUrl = item.image;
-                console.log("Attempting to delete image:", imageUrl);
+                // Create missing categories
+                const missingCategories = uniqueCategories.filter(c => !categoryMap.has(c));
+                if (missingCategories.length > 0) {
+                    const { data: newCats } = await supabase
+                        .from("categories")
+                        .insert(missingCategories.map((name, index) => ({
+                            store_id: user.storeId,
+                            name: name,
+                            sort_order: categories.length + index
+                        })))
+                        .select("id, name");
 
-                if (imageUrl.includes("menu-images")) {
-                    try {
-                        // Extract filename: take everything after the last '/'
-                        // URL: .../menu-images/filename.ext
-                        const fileNameWithParams = imageUrl.substring(imageUrl.lastIndexOf('/') + 1);
-
-                        // Remove query params if any
-                        const fileName = fileNameWithParams.split('?')[0];
-                        const decodedFileName = decodeURIComponent(fileName);
-
-                        console.log("Attempting to delete file:", decodedFileName);
-
-                        if (decodedFileName) {
-                            const { data: removeData, error: storageError } = await supabase.storage
-                                .from('menu-images')
-                                .remove([decodedFileName]);
-
-                            if (storageError) {
-                                console.error("Failed to delete image from storage:", storageError);
-                            } else {
-                                console.log("Image deleted successfully:", removeData);
-                            }
-                        }
-                    } catch (err) {
-                        console.error("Error parsing/deleting image:", err);
+                    if (newCats) {
+                        newCats.forEach(c => categoryMap.set(c.name, c.id));
                     }
-                } else {
-                    console.log("Image is not in 'menu-images' bucket, skipping storage delete.");
                 }
             }
 
+            // 2. Prepare Menu Items
+            const menuItemsToInsert = items.map(item => ({
+                store_id: user.storeId,
+                name: item.name,
+                price: item.price,
+                category_id: categoryMap.get(item.category) || null,
+                description: item.description,
+                image: item.image,
+                available: true
+            }));
+
+            // 3. Bulk Insert
+            const { error } = await supabase
+                .from("menu_items")
+                .insert(menuItemsToInsert);
+
+            if (error) throw error;
+
             await fetchMenuData();
+            return { success: true };
+
+        } catch (error: any) {
+            console.error("Error bulk importing items:", error);
+            return { success: false, error: error.message };
         } finally {
             setIsLoading(false);
         }
@@ -561,7 +416,14 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
             isLoading,
             setPublicStoreId,
             publicStoreId,
-            storeSettings
+            storeSettings,
+            fetchGlobalMenus,
+            importGlobalMenuItem,
+            bulkImportMenuItems,
+            hasMore,
+            loadMoreMenuItems,
+            refetchMenu,
+            isFetchingMore
         }}>
             {children}
         </MenuContext.Provider>

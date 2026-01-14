@@ -21,7 +21,7 @@ import { subDays } from "date-fns";
 import { useAuth } from "../../context/AuthContext";
 
 export default function CounterPage() {
-    const { menuItems, categories: contextCategories, discounts } = useMenu();
+    const { menuItems, categories: contextCategories, discounts, hasMore, loadMoreMenuItems, refetchMenu, isLoading, isFetchingMore } = useMenu();
     const [activeCategory, setActiveCategory] = useState<Category>("All");
     const [selectedItem, setSelectedItem] = useState<MenuItem | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -47,6 +47,7 @@ export default function CounterPage() {
     const queueTargetRef = React.useRef<HTMLDivElement>(null);
     const submitButtonRef = React.useRef<HTMLDivElement>(null);
     const mobileCartRef = React.useRef<HTMLButtonElement>(null);
+    const loadMoreRef = React.useRef<HTMLDivElement>(null);
 
     // Categories for filter
     const categories = useMemo(() => ["All", ...contextCategories], [contextCategories]);
@@ -92,6 +93,9 @@ export default function CounterPage() {
         };
 
         fetchBestSellers();
+
+        // Reset menu view to public-safe state on mount
+        refetchMenu({ includeUnavailable: false });
     }, [user?.storeId]);
 
     // Calculate best seller rankings
@@ -106,32 +110,31 @@ export default function CounterPage() {
         return rankings;
     }, [bestSellers]);
 
-    // Sort filtered items: Best Sellers first (by rank), then Recommended, then others
-    const sortedFilteredItems = useMemo(() => {
-        return [...menuItems]
-            .filter(item =>
-                (activeCategory === "All" || item.category === activeCategory) &&
-                item.available !== false
-            )
-            .sort((a, b) => {
-                const aRank = bestSellerRankings.get(a.id) || 999;
-                const bRank = bestSellerRankings.get(b.id) || 999;
-
-                // Priority 1: Best sellers by ranking
-                if (aRank !== bRank) return aRank - bRank;
-
-                // Priority 2: If both are NOT best sellers, recommended items come first
-                if (aRank === 999 && bRank === 999) {
-                    if (a.isRecommended && !b.isRecommended) return -1;
-                    if (!a.isRecommended && b.isRecommended) return 1;
+    // Infinite Scroll Observer
+    React.useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                if (entries[0].isIntersecting && hasMore && !isLoading) {
+                    loadMoreMenuItems();
                 }
+            },
+            { threshold: 0.1 }
+        );
 
-                // Default: alphabetical by name
-                return a.name.localeCompare(b.name, 'th');
-            });
-    }, [menuItems, activeCategory, bestSellerRankings]);
+        if (loadMoreRef.current) {
+            observer.observe(loadMoreRef.current);
+        }
 
-    const filteredItems = sortedFilteredItems;
+        return () => observer.disconnect();
+    }, [hasMore, isLoading, loadMoreMenuItems]);
+
+    // Handle Category Change
+    const handleCategoryChange = (cat: string) => {
+        setActiveCategory(cat);
+        refetchMenu({ category: cat });
+    };
+
+    const filteredItems = menuItems; // Context now handles filtering/pagination
 
     const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 
@@ -258,45 +261,45 @@ export default function CounterPage() {
                 {/* Left: Menu Area */}
                 <div className={`flex-col h-full bg-[var(--color-coffee-50)] min-w-0 flex-1 ${activeTab === "menu" ? "flex" : "hidden lg:flex"} `}>
                     {/* Header */}
-                    <div className="bg-white p-4 border-b border-[var(--color-coffee-100)] flex justify-between items-center shrink-0">
-                        <div className="flex items-center gap-4">
-                            <Link href="/" className="text-sm font-bold text-[var(--color-coffee-500)] flex items-center gap-2">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
-                                </svg>
-                                <span className="hidden sm:inline">หน้าหลัก</span>
-                            </Link>
-                            <button
-                                onClick={() => setIsHistoryOpen(true)}
-                                className="text-sm font-bold text-[var(--color-primary)] flex items-center gap-2 hover:underline"
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
-                                </svg>
-                                <span className="hidden sm:inline">ประวัติ</span>
-                            </button>
-                            <div className="h-4 w-px bg-[var(--color-coffee-300)] mx-2 hidden sm:block"></div>
-                            <Link href="/reports" className="text-sm font-bold text-[var(--color-coffee-600)] flex items-center gap-2 hover:text-[var(--color-primary)] transition-colors">
-                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                                    <path d="M2 11a1 1 0 011-1h2a1 1 0 011 1v5a1 1 0 01-1 1H3a1 1 0 01-1-1v-5zM8 7a1 1 0 011-1h2a1 1 0 011 1v9a1 1 0 01-1 1H9a1 1 0 01-1-1V7zM14 4a1 1 0 011-1h2a1 1 0 011 1v12a1 1 0 01-1 1h-2a1 1 0 01-1-1V4z" />
-                                </svg>
-                                <span className="hidden sm:inline">รายงาน</span>
-                            </Link>
+                    <div className="bg-white border-b border-[var(--color-coffee-100)] shrink-0">
+                        {/* Top Row - Navigation */}
+                        <div className="px-4 py-3 flex justify-between items-center">
+                            <div className="flex items-center gap-3">
+                                <Link href="/" className="text-sm font-bold text-[var(--color-coffee-500)] flex items-center gap-2 hover:text-[var(--color-primary)] transition-colors">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M9.707 16.707a1 1 0 01-1.414 0l-6-6a1 1 0 010-1.414l6-6a1 1 0 011.414 1.414L5.414 9H17a1 1 0 110 2H5.414l4.293 4.293a1 1 0 010 1.414z" clipRule="evenodd" />
+                                    </svg>
+                                    <span>หน้าหลัก</span>
+                                </Link>
+                                <div className="h-4 w-px bg-[var(--color-coffee-200)]"></div>
+                                <button
+                                    onClick={() => setIsHistoryOpen(true)}
+                                    className="text-sm font-bold text-[var(--color-primary)] flex items-center gap-2 hover:underline"
+                                >
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                        <path fillRule="evenodd" d="M10 18a8 8 0 100-16 8 8 0 000 16zm1-12a1 1 0 10-2 0v4a1 1 0 00.293.707l2.828 2.829a1 1 0 101.415-1.415L11 9.586V6z" clipRule="evenodd" />
+                                    </svg>
+                                    <span>ประวัติ</span>
+                                </button>
+                            </div>
                         </div>
 
-                        <div className="flex space-x-2 overflow-x-auto no-scrollbar">
-                            {categories.map((cat) => (
-                                <button
-                                    key={cat}
-                                    onClick={() => setActiveCategory(cat)}
-                                    className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeCategory === cat
-                                        ? "bg-[var(--color-primary)] text-white shadow"
-                                        : "bg-white text-[var(--color-coffee-600)] border border-[var(--color-coffee-200)]"
-                                        } `}
-                                >
-                                    {cat === "All" ? "ทั้งหมด" : cat}
-                                </button>
-                            ))}
+                        {/* Bottom Row - Category Filters */}
+                        <div className="px-4 pb-3 overflow-x-auto scrollbar-hide">
+                            <div className="flex gap-2">
+                                {categories.map((cat) => (
+                                    <button
+                                        key={cat}
+                                        onClick={() => handleCategoryChange(cat)}
+                                        className={`px-4 py-2 rounded-lg text-sm font-bold transition-all whitespace-nowrap ${activeCategory === cat
+                                            ? "bg-[var(--color-primary)] text-white shadow-md"
+                                            : "bg-white text-[var(--color-coffee-600)] border border-[var(--color-coffee-200)] hover:border-[var(--color-primary)] hover:text-[var(--color-primary)]"
+                                            } `}
+                                    >
+                                        {cat === "All" ? "ทั้งหมด" : cat}
+                                    </button>
+                                ))}
+                            </div>
                         </div>
                     </div>
 
@@ -317,6 +320,15 @@ export default function CounterPage() {
                                 );
                             })}
                         </div>
+
+                        {/* Load More Trigger */}
+                        {hasMore && (
+                            <div ref={loadMoreRef} className="py-4 flex justify-center w-full">
+                                {(isLoading || isFetchingMore) && (
+                                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
+                                )}
+                            </div>
+                        )}
                     </div>
                 </div>
 

@@ -79,7 +79,15 @@ export default function Home() {
                 </Button>
               </Link>
 
-              <div className="pt-4">
+              <div className="pt-4 gap-4">
+                <Link href="/reports">
+                  <Button fullWidth variant="outline">
+                    รายงาน
+                  </Button>
+                </Link>
+              </div>
+
+              <div >
                 <Link href="/admin/menu">
                   <Button fullWidth variant="outline">
                     จัดการเมนู

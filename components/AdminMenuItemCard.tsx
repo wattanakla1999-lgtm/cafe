@@ -12,7 +12,7 @@ export function AdminMenuItemCard({ item, onEdit, onDelete, onToggleAvailability
     return (
         <div className={`bg-white rounded-xl shadow-sm border border-[var(--color-coffee-200)] flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow ${!item.available ? 'opacity-75 grayscale-[0.5]' : ''}`}>
             {/* Image Area - Fixed Height for Uniformity */}
-            <div className="h-48 w-full bg-[var(--color-coffee-50)] relative overflow-hidden group">
+            <div className="h-48 w-full bg-[var(--color-coffee-50)] relative overflow-hidden group rounded-t-xl">
                 {item.image ? (
                     <img
                         src={item.image}
@@ -28,7 +28,7 @@ export function AdminMenuItemCard({ item, onEdit, onDelete, onToggleAvailability
                 )}
 
                 {/* Category Badge */}
-                <span className="absolute top-2 right-2 px-2 py-1 bg-white/90 backdrop-blur-sm text-[var(--color-coffee-700)] text-xs font-bold rounded-full shadow-sm z-10">
+                <span className="absolute top-4 right-4 px-2 py-1 bg-white/90 backdrop-blur-sm text-[var(--color-coffee-700)] text-xs font-bold rounded-full shadow-sm">
                     {item.category}
                 </span>
 

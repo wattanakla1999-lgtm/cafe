@@ -192,6 +192,16 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     console.log("[Auth] User signed out, clearing state");
                     setUser(null);
                     localStorage.removeItem('cafe_user');
+                    router.push("/login");
+                    return;
+                }
+
+                // Handle token expiry - redirect to login
+                if (event === "TOKEN_REFRESHED" && !session) {
+                    console.log("[Auth] 🔐 Token refresh failed (expired), redirecting to login");
+                    setUser(null);
+                    localStorage.removeItem('cafe_user');
+                    router.push("/login");
                     return;
                 }
 

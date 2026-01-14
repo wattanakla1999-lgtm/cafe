@@ -15,6 +15,8 @@ import { ToppingManagerModal } from "../../../components/ToppingManagerModal";
 import { StoreSettingsModal } from "../../../components/StoreSettingsModal";
 import { ProtectedRoute } from "../../../components/ProtectedRoute";
 import { useConfirm } from "../../../context/ConfirmContext";
+import { GlobalMenuLibraryModal } from "../../../components/GlobalMenuLibraryModal";
+import { BulkImportModal } from "../../../components/BulkImportModal";
 
 // Helper Component for Mobile Dropdown
 function MenuDropdown({
@@ -115,7 +117,7 @@ function MenuDropdown({
 }
 
 function MenuContent() {
-    const { menuItems, categories: contextCategories, addMenuItem, updateMenuItem, deleteMenuItem, isLoading } = useMenu();
+    const { menuItems, categories: contextCategories, addMenuItem, updateMenuItem, deleteMenuItem, isLoading, hasMore, loadMoreMenuItems, refetchMenu, isFetchingMore } = useMenu();
     const searchParams = useSearchParams();
 
     // UI State
@@ -129,25 +131,29 @@ function MenuContent() {
     const [isToppingManagerOpen, setIsToppingManagerOpen] = useState(false);
     const [isServingTypeManagerOpen, setIsServingTypeManagerOpen] = useState(false);
     const [isSettingsOpen, setIsSettingsOpen] = useState(false);
+    const [isGlobalMenuOpen, setIsGlobalMenuOpen] = useState(false);
+    const [isBulkImportOpen, setIsBulkImportOpen] = useState(false);
     const [editingItem, setEditingItem] = useState<MenuItem | null>(null);
     const { confirm } = useConfirm();
+    const loadMoreRef = useState<{ current: HTMLDivElement | null }>({ current: null })[0]; // Ref placeholder, actually using callback ref below or just standard useRef
 
-    useEffect(() => {
-        if (searchParams.get("modal") === "discounts") {
-            setIsDiscountManagerOpen(true);
-        }
-    }, [searchParams]);
-
-    // Filter/Search State (Optional enhancement for "many menus")
+    // Search State
     const [searchQuery, setSearchQuery] = useState("");
 
-    // Filter items
-    const filteredItems = menuItems.filter(item => {
-        const matchesSearch = item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-            item.category.toLowerCase().includes(searchQuery.toLowerCase());
-        const matchesCategory = activeCategory === "All" || item.category === activeCategory;
-        return matchesSearch && matchesCategory;
-    });
+    // Debounce Search & Initial Load
+    useEffect(() => {
+        const timer = setTimeout(() => {
+            refetchMenu({
+                search: searchQuery,
+                category: activeCategory,
+                includeUnavailable: true
+            });
+        }, 300);
+        return () => clearTimeout(timer);
+    }, [searchQuery]);
+
+    // Use menuItems directly (Context handles filtering)
+    const filteredItems = menuItems;
 
     // Categories for filter
     const categories = ["All", ...contextCategories];
@@ -260,6 +266,20 @@ function MenuContent() {
                             />
                         </div>
 
+                        <Button variant="outline" onClick={() => setIsGlobalMenuOpen(true)} className="flex items-center gap-2 px-3 sm:px-4 text-[var(--color-primary)] border-[var(--color-primary)] hover:bg-orange-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">นำเข้าเมนู</span>
+                        </Button>
+
+                        <Button variant="outline" onClick={() => setIsBulkImportOpen(true)} className="flex items-center gap-2 px-3 sm:px-4 text-green-600 border-green-600 hover:bg-green-50">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                <path fillRule="evenodd" d="M3 17a1 1 0 011-1h12a1 1 0 110 2H4a1 1 0 01-1-1zm3.293-7.707a1 1 0 011.414 0L9 10.586V3a1 1 0 112 0v7.586l1.293-1.293a1 1 0 111.414 1.414l-3 3a1 1 0 01-1.414 0l-3-3a1 1 0 010-1.414z" clipRule="evenodd" />
+                            </svg>
+                            <span className="hidden sm:inline">Excel</span>
+                        </Button>
+
                         <Button variant="primary" onClick={handleAddNew} className="flex items-center gap-2 shadow-lg shadow-orange-100 px-3 sm:px-4">
                             <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
@@ -291,12 +311,15 @@ function MenuContent() {
                     </div>
 
                     {/* Filters */}
-                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 no-scrollbar">
+                    <div className="flex gap-2 mb-6 overflow-x-auto pb-2 scrollbar-hide max-w-full">
                         {categories.map((cat) => (
                             <button
                                 key={cat}
-                                onClick={() => setActiveCategory(cat)}
-                                className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap ${activeCategory === cat
+                                onClick={() => {
+                                    setActiveCategory(cat);
+                                    refetchMenu({ category: cat, search: searchQuery, includeUnavailable: true });
+                                }}
+                                className={`px-4 py-2 rounded-full text-sm font-bold transition-all whitespace-nowrap flex-shrink-0 ${activeCategory === cat
                                     ? "bg-[var(--color-primary)] text-white shadow-md shadow-orange-200"
                                     : "bg-white text-[var(--color-coffee-600)] border border-[var(--color-coffee-200)] hover:bg-[var(--color-coffee-50)]"
                                     }`}
@@ -331,6 +354,30 @@ function MenuContent() {
                             <span className="font-bold">เพิ่มเมนูใหม่</span>
                         </div>
                     </div>
+
+                    {/* Load More & Observer */}
+                    {hasMore && (
+                        <div
+                            ref={(el) => {
+                                if (!el) return;
+                                const observer = new IntersectionObserver(
+                                    (entries) => {
+                                        if (entries[0].isIntersecting && hasMore && !isLoading) {
+                                            loadMoreMenuItems();
+                                        }
+                                    },
+                                    { threshold: 0.1 }
+                                );
+                                observer.observe(el);
+                                return () => observer.disconnect();
+                            }}
+                            className="py-8 flex justify-center w-full"
+                        >
+                            {(isLoading || isFetchingMore) && (
+                                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-[var(--color-primary)]"></div>
+                            )}
+                        </div>
+                    )}
                 </main>
 
                 {/* Modal */}
@@ -364,6 +411,16 @@ function MenuContent() {
                 <StoreSettingsModal
                     isOpen={isSettingsOpen}
                     onClose={() => setIsSettingsOpen(false)}
+                />
+
+                <GlobalMenuLibraryModal
+                    isOpen={isGlobalMenuOpen}
+                    onClose={() => setIsGlobalMenuOpen(false)}
+                />
+
+                <BulkImportModal
+                    isOpen={isBulkImportOpen}
+                    onClose={() => setIsBulkImportOpen(false)}
                 />
             </div>
         </ProtectedRoute>

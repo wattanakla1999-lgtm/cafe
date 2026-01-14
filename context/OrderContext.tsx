@@ -104,6 +104,16 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
                 if (!response.ok) {
                     const errorText = await response.text();
+
+                    // Check for JWT expired error - trigger logout and redirect to login
+                    if (response.status === 401 && errorText.includes('JWT expired')) {
+                        console.warn("[Orders] 🔐 JWT expired, logging out...");
+                        // Clear local storage and redirect
+                        localStorage.removeItem('cafe_user');
+                        window.location.href = '/login';
+                        return;
+                    }
+
                     // Check for 5xx errors or specific fetch issues to retry
                     if (retryCount < 3) {
                         console.warn(`[Orders] ⚠️ Fetch error (Attempt ${retryCount + 1}), retrying...`, response.status, errorText);
