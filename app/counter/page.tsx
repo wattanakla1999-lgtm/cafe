@@ -613,7 +613,7 @@ export default function CounterPage() {
                     </div>
 
                     {/* Mobile Bottom Navigation - Visible on screens smaller than LG (1024px) */}
-                    <div className="lg:hidden absolute bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] border-t border-[var(--color-coffee-200)] flex justify-around p-3 z-[100]">
+                    <div className="lg:hidden fixed bottom-0 left-0 right-0 bg-white rounded-t-2xl shadow-[0_-4px_6px_-1px_rgba(0,0,0,0.1)] border-t border-[var(--color-coffee-200)] flex justify-around p-3 z-[100]">
 
                         <button
                             onClick={() => setActiveTab("menu")}

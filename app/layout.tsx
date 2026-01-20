@@ -31,7 +31,7 @@ export const metadata: Metadata = {
   robots: {
     index: true,
     follow: true,
-  }
+  },
 };
 
 import { Providers } from "../components/Providers";
