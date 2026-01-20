@@ -1,6 +1,6 @@
 "use client";
 
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMenu } from "../context/MenuContext";
 import { Button } from "./Button";
 
@@ -10,12 +10,14 @@ interface GlobalMenuLibraryModalProps {
 }
 
 export function GlobalMenuLibraryModal({ isOpen, onClose }: GlobalMenuLibraryModalProps) {
-    const { fetchGlobalMenus, bulkImportMenuItems } = useMenu();
+    const { fetchGlobalMenus, fetchGlobalCategories, bulkImportMenuItems } = useMenu();
     const [menus, setMenus] = useState<any[]>([]);
+    const [categories, setCategories] = useState<string[]>(["All"]);
     const [loading, setLoading] = useState(false);
     const [isFetchingMore, setIsFetchingMore] = useState(false);
     const [hasMore, setHasMore] = useState(true);
     const [page, setPage] = useState(0);
+    const loaderRef = useRef<HTMLDivElement>(null);
 
     // Selection & Import State
     const [selectedItems, setSelectedItems] = useState<Set<string>>(new Set());
@@ -39,8 +41,17 @@ export function GlobalMenuLibraryModal({ isOpen, onClose }: GlobalMenuLibraryMod
         if (isOpen) {
             loadMenus(0, true);
             setSelectedItems(new Set());
+            // Load categories only once when opening
+            fetchGlobalCategories().then(setCategories);
         }
-    }, [isOpen, activeCategory, debouncedSearch]);
+    }, [isOpen]); // Keep isOpen as dependency, others trigger specific effects?
+
+    // Trigger loadMenus when filters change
+    useEffect(() => {
+        if (isOpen) {
+            loadMenus(0, true);
+        }
+    }, [activeCategory, debouncedSearch]);
 
     const loadMenus = async (pageNum: number = 0, reset: boolean = false) => {
         if (reset) {
@@ -83,6 +94,28 @@ export function GlobalMenuLibraryModal({ isOpen, onClose }: GlobalMenuLibraryMod
         loadMenus(page + 1, false);
     };
 
+    useEffect(() => {
+        const observer = new IntersectionObserver(
+            (entries) => {
+                const target = entries[0];
+                if (target.isIntersecting && hasMore && !isFetchingMore && !loading) {
+                    loadMenus(page + 1, false);
+                }
+            },
+            { threshold: 0.1 }
+        );
+
+        if (loaderRef.current) {
+            observer.observe(loaderRef.current);
+        }
+
+        return () => {
+            if (loaderRef.current) {
+                observer.unobserve(loaderRef.current);
+            }
+        };
+    }, [hasMore, isFetchingMore, loading, page]);
+
     const toggleSelection = (item: any) => {
         const newSet = new Set(selectedItems);
         if (newSet.has(item.id)) {
@@ -124,12 +157,11 @@ export function GlobalMenuLibraryModal({ isOpen, onClose }: GlobalMenuLibraryMod
 
     if (!isOpen) return null;
 
-    // Get unique categories from loaded menus
-    const categories = ["All", ...Array.from(new Set(menus.map(m => m.category)))];
+
 
     return (
         <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm animate-in fade-in duration-200">
-            <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl m-4 overflow-hidden flex flex-col max-h-[90vh] relative">
+            <div className="bg-white rounded-2xl shadow-xl w-full max-w-4xl m-4 overflow-hidden flex flex-col h-[85vh] relative">
 
                 {/* Header */}
                 <div className="p-4 md:p-6 border-b border-gray-100 bg-white z-10 flex flex-col gap-4">
@@ -234,19 +266,7 @@ export function GlobalMenuLibraryModal({ isOpen, onClose }: GlobalMenuLibraryMod
                                 {/* Infinite Scroll Trigger */}
                                 {hasMore && (
                                     <div
-                                        ref={(el) => {
-                                            if (!el) return;
-                                            const observer = new IntersectionObserver(
-                                                (entries) => {
-                                                    if (entries[0].isIntersecting && hasMore && !isFetchingMore && !loading) {
-                                                        loadMore();
-                                                    }
-                                                },
-                                                { threshold: 0.1 }
-                                            );
-                                            observer.observe(el);
-                                            return () => observer.disconnect();
-                                        }}
+                                        ref={loaderRef}
                                         className="py-8 flex justify-center w-full"
                                     >
                                         {isFetchingMore && (

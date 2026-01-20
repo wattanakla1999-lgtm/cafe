@@ -130,7 +130,7 @@ export function Combobox({
                         ))
                     ) : (
                         <div className="px-4 py-3 text-sm text-[var(--color-coffee-400)] italic text-center">
-                            กด Enter เพื่อเพิ่ม "{search}"
+                            ไม่พบหมวดหมู่ "{search}"
                         </div>
                     )}
                 </div>

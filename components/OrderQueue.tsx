@@ -52,7 +52,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                     </div>
                 ) : (
                     activeOrders.map((order, index) => (
-                        <div key={order.orderId} className={`bg-white rounded-xl shadow-sm border p-4 transition-all ${index === 0 ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]" : "border-[var(--color-coffee-200)]"
+                        <div key={order.orderId} data-tour-order={index === 0 ? "first" : undefined} className={`bg-white rounded-xl shadow-sm border p-4 transition-all ${index === 0 ? "border-[var(--color-primary)] ring-1 ring-[var(--color-primary)]" : "border-[var(--color-coffee-200)]"
                             }`}>
                             <div className="flex justify-between items-start mb-2">
                                 <div>
@@ -177,6 +177,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                                             setProcessingId(null);
                                         }}
                                         disabled={processingId === order.id}
+                                        data-tour={index === 0 ? "start-cooking" : undefined}
                                     >
                                         {processingId === order.id ? "..." : "เริ่มทำ"}
                                     </Button>
@@ -193,6 +194,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                                             setProcessingId(null);
                                         }}
                                         disabled={processingId === order.id}
+                                        data-tour={index === 0 ? "mark-ready" : undefined}
                                     >
                                         {processingId === order.id ? "..." : "พร้อมเสิร์ฟ"}
                                     </Button>
@@ -209,6 +211,7 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
                                             setProcessingId(null);
                                         }}
                                         disabled={processingId === order.id}
+                                        data-tour={index === 0 ? "mark-served" : undefined}
                                     >
                                         {processingId === order.id ? "..." : "เสิร์ฟแล้ว"}
                                     </Button>

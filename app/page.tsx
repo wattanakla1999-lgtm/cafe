@@ -1,21 +1,47 @@
 "use client";
 
 import Link from "next/link";
-import { useState } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "../components/Button";
 import { useAuth } from "../context/AuthContext";
 import { OrderQRModal } from "../components/OrderQRModal";
+import { useTour } from "../context/TourContext";
 
 export default function Home() {
   const { user, logout, isLoading } = useAuth();
+  const { isActive, startTour, currentTourStep } = useTour();
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [showWelcome, setShowWelcome] = useState(false);
+
+  // Check if should show welcome modal to start tour
+  useEffect(() => {
+    if (user && !user.onboardingCompleted && !isActive) {
+      // Check if we haven't started tour yet
+      const savedStep = localStorage.getItem('cafe_tour_step');
+      if (savedStep === null) {
+        setShowWelcome(true);
+      } else if (savedStep !== 'skipped' && savedStep !== 'completed') {
+        startTour(); // Resume tour
+      }
+    }
+  }, [user, isActive, startTour]);
+
+  const handleStartTour = () => {
+    setShowWelcome(false);
+    startTour();
+  };
+
+  const handleSkipTour = () => {
+    setShowWelcome(false);
+    // Mark as completed without starting
+    localStorage.setItem('cafe_tour_step', 'skipped');
+  };
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
     await logout();
-    // No need to set false, router will redirect
   };
 
   if (isLoading) {
@@ -30,10 +56,10 @@ export default function Home() {
   }
 
   return (
-    <div className="min-h-screen flex flex-col items-center justify-center p-8 bg-[var(--color-background)]">
-      <div className="max-w-md w-full text-center space-y-8 animate-scale-up">
+    <div className="min-h-screen flex flex-col items-center justify-center px-4 py-8 bg-[var(--color-background)]">
+      <div className="max-w-md w-full mx-auto text-center space-y-8 animate-scale-up">
 
-        {/* ... Header ... */}
+        {/* Header */}
         <div className="space-y-2">
           <h1 className="text-4xl font-bold text-[var(--color-primary)]">Cafe System</h1>
           <p className="text-[var(--color-coffee-500)]">
@@ -43,25 +69,21 @@ export default function Home() {
 
         <div className="grid gap-4">
 
-          {/* ... Public Area ... */}
+          {/* Public Area */}
           <div className="pt-4">
             <Button fullWidth variant="outline" onClick={() => setIsQrOpen(true)}>
               แสดง QRCode เพื่อสั่งเมนู
             </Button>
           </div>
 
-
-
           {!user ? (
-            /* ... Guest View ... */
+            /* Guest View */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
-
               <Link href="/login">
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
                   เข้าสู่ระบบร้านค้า
                 </Button>
               </Link>
-              <div>user{user}</div>
               <Link href="/register">
                 <Button fullWidth variant="ghost">
                   สร้างร้านค้าใหม่
@@ -69,17 +91,15 @@ export default function Home() {
               </Link>
             </div>
           ) : (
-
-
             /* Logged In / Store View */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
-              <Link href="/counter">
+              <Link href="/counter" data-tour="counter-button">
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
                   เปิดจุดชำระเงิน
                 </Button>
               </Link>
 
-              <div className="pt-4 gap-4">
+              <div className="pt-4 gap-4" data-tour="reports-button">
                 <Link href="/reports">
                   <Button fullWidth variant="outline">
                     รายงาน
@@ -87,7 +107,7 @@ export default function Home() {
                 </Link>
               </div>
 
-              <div >
+              <div data-tour="menu-button">
                 <Link href="/admin/menu">
                   <Button fullWidth variant="outline">
                     จัดการเมนู
@@ -107,43 +127,84 @@ export default function Home() {
             </div>
           )}
         </div>
-      </div>
+      </div >
 
       <OrderQRModal
         isOpen={isQrOpen}
         onClose={() => setIsQrOpen(false)}
       />
 
-      {/* Logout Confirmation Modal */}
-      {showLogoutConfirm && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
-          <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm animate-scale-up">
-            <h3 className="text-xl font-bold text-gray-900 mb-2">ยืนยันการออกจากระบบ</h3>
-            <p className="text-gray-600 mb-6">คุณต้องการออกจากระบบใช่หรือไม่?</p>
-
-            <div className="flex gap-3">
-              <Button
-                fullWidth
-                variant="outline"
-                onClick={() => setShowLogoutConfirm(false)}
-                disabled={isLoggingOut}
-              >
-                ยกเลิก
-              </Button>
-              <Button
-                fullWidth
-                variant="primary"
-                className="bg-red-600 hover:bg-red-700 text-white"
-                onClick={handleLogout}
-                disabled={isLoggingOut}
-              >
-                {isLoggingOut ? "กำลังออก..." : "ออกจากระบบ"}
-              </Button>
+      {/* Welcome Modal - Start Tour */}
+      {
+        showWelcome && (
+          <div className="fixed inset-0 z-[100] flex items-center justify-center bg-black/60 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-2xl shadow-2xl w-full max-w-sm overflow-hidden animate-scale-up">
+              <div className="p-6 text-center space-y-4">
+                <div className="w-20 h-20 bg-gradient-to-br from-orange-400 to-orange-600 rounded-full flex items-center justify-center text-4xl shadow-lg shadow-orange-200 mx-auto">
+                  ☕
+                </div>
+                <h2 className="text-2xl font-bold text-gray-900">ยินดีต้อนรับ! 🎉</h2>
+                <p className="text-gray-600">
+                  ขอบคุณที่เลือกใช้ <span className="font-bold text-orange-600">Cafe POS</span>
+                </p>
+                <p className="text-gray-500 text-sm">
+                  มาเรียนรู้การใช้งานเบื้องต้นกัน!
+                  <br />
+                  เราจะพาคุณตั้งค่าร้านทีละขั้นตอน ✨
+                </p>
+              </div>
+              <div className="p-6 pt-0 space-y-3">
+                <Button
+                  fullWidth
+                  variant="primary"
+                  onClick={handleStartTour}
+                  className="shadow-lg shadow-orange-200"
+                >
+                  เริ่มกันเลย! 🚀
+                </Button>
+                <button
+                  onClick={handleSkipTour}
+                  className="w-full text-center text-sm text-gray-400 hover:text-gray-600 transition-colors"
+                >
+                  ข้ามการแนะนำ
+                </button>
+              </div>
             </div>
           </div>
-        </div>
-      )}
-    </div>
+        )
+      }
+
+      {/* Logout Confirmation Modal */}
+      {
+        showLogoutConfirm && (
+          <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/50 backdrop-blur-sm p-4 animate-fade-in">
+            <div className="bg-white rounded-xl shadow-xl p-6 w-full max-w-sm animate-scale-up">
+              <h3 className="text-xl font-bold text-gray-900 mb-2">ยืนยันการออกจากระบบ</h3>
+              <p className="text-gray-600 mb-6">คุณต้องการออกจากระบบใช่หรือไม่?</p>
+
+              <div className="flex gap-3">
+                <Button
+                  fullWidth
+                  variant="outline"
+                  onClick={() => setShowLogoutConfirm(false)}
+                  disabled={isLoggingOut}
+                >
+                  ยกเลิก
+                </Button>
+                <Button
+                  fullWidth
+                  variant="primary"
+                  className="bg-red-600 hover:bg-red-700 text-white"
+                  onClick={handleLogout}
+                  disabled={isLoggingOut}
+                >
+                  {isLoggingOut ? "กำลังออก..." : "ออกจากระบบ"}
+                </Button>
+              </div>
+            </div>
+          </div>
+        )
+      }
+    </div >
   );
 }
-

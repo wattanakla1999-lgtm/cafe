@@ -150,7 +150,7 @@ export function CategoryManagerModal({ isOpen, onClose }: CategoryManagerModalPr
                     {mode === "list" ? (
                         <>
                             <Button fullWidth variant="outline" onClick={onClose}>ปิด</Button>
-                            <Button fullWidth onClick={handleStartAdd} variant="primary">เพิ่มหมวดหมู่</Button>
+                            <Button fullWidth onClick={handleStartAdd} variant="primary" data-tour="category-add">เพิ่มหมวดหมู่</Button>
                         </>
                     ) : (
                         <>

@@ -272,29 +272,35 @@ export default function ReportsPage() {
                             <h1 className="text-xl font-bold text-[var(--color-coffee-900)] whitespace-nowrap">แดชบอร์ดการขาย</h1>
                         </div>
 
-                        <div className="flex items-center gap-2 bg-[var(--color-coffee-50)] p-2 rounded-lg border border-[var(--color-coffee-100)] w-full md:w-auto justify-center overflow-x-auto md:overflow-visible">
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-sm font-bold text-[var(--color-coffee-600)] whitespace-nowrap">จาก:</span>
-                                <CustomDatePicker
-                                    selected={parseISO(dateRange.start)}
-                                    onChange={(date) => date && setDateRange(prev => ({ ...prev, start: format(date, "yyyy-MM-dd") }))}
-                                    selectsStart
-                                    startDate={parseISO(dateRange.start)}
-                                    endDate={parseISO(dateRange.end)}
-                                    maxDate={new Date()} // Can't select future
-                                />
+                        <div className="flex flex-col md:flex-row items-stretch md:items-center gap-2 bg-[var(--color-coffee-50)] p-2 rounded-lg border border-[var(--color-coffee-100)] w-full md:w-auto">
+                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                <span className="shrink-0 w-8 md:w-auto text-sm font-bold text-[var(--color-coffee-600)]">จาก:</span>
+                                <div className="flex-1 md:w-auto">
+                                    <CustomDatePicker
+                                        selected={parseISO(dateRange.start)}
+                                        onChange={(date) => date && setDateRange(prev => ({ ...prev, start: format(date, "yyyy-MM-dd") }))}
+                                        selectsStart
+                                        startDate={parseISO(dateRange.start)}
+                                        endDate={parseISO(dateRange.end)}
+                                        maxDate={new Date()}
+                                        className="w-full"
+                                    />
+                                </div>
                             </div>
-                            <div className="flex items-center gap-2 shrink-0">
-                                <span className="text-sm font-bold text-[var(--color-coffee-600)] whitespace-nowrap">ถึง:</span>
-                                <CustomDatePicker
-                                    selected={parseISO(dateRange.end)}
-                                    onChange={(date) => date && setDateRange(prev => ({ ...prev, end: format(date, "yyyy-MM-dd") }))}
-                                    selectsEnd
-                                    startDate={parseISO(dateRange.start)}
-                                    endDate={parseISO(dateRange.end)}
-                                    minDate={parseISO(dateRange.start)}
-                                    maxDate={new Date()}
-                                />
+                            <div className="flex items-center gap-2 w-full md:w-auto">
+                                <span className="shrink-0 w-8 md:w-auto text-sm font-bold text-[var(--color-coffee-600)]">ถึง:</span>
+                                <div className="flex-1 md:w-auto">
+                                    <CustomDatePicker
+                                        selected={parseISO(dateRange.end)}
+                                        onChange={(date) => date && setDateRange(prev => ({ ...prev, end: format(date, "yyyy-MM-dd") }))}
+                                        selectsEnd
+                                        startDate={parseISO(dateRange.start)}
+                                        endDate={parseISO(dateRange.end)}
+                                        minDate={parseISO(dateRange.start)}
+                                        maxDate={new Date()}
+                                        className="w-full"
+                                    />
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -313,10 +319,19 @@ export default function ReportsPage() {
                         <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
                             {/* Header Section */}
                             <div className="mb-6">
-                                <h2 className="text-2xl font-bold text-[var(--color-coffee-900)]">
+                                <h2 className="text-lg md:text-2xl font-bold text-[var(--color-coffee-900)]">
                                     {dateRange.start === dateRange.end
                                         ? `ยอดขายประจำวันที่ ${format(parseISO(dateRange.start), 'dd MMMM yyyy', { locale: th })}`
-                                        : `ยอดขายตั้งแต่วันที่ ${format(parseISO(dateRange.start), 'dd MMM', { locale: th })} ถึง ${format(parseISO(dateRange.end), 'dd MMM yyyy', { locale: th })}`
+                                        : (
+                                            <>
+                                                <span className="md:hidden">
+                                                    ยอดขาย {format(parseISO(dateRange.start), 'd MMM', { locale: th })} - {format(parseISO(dateRange.end), 'd MMM yy', { locale: th })}
+                                                </span>
+                                                <span className="hidden md:inline">
+                                                    ยอดขายตั้งแต่วันที่ {format(parseISO(dateRange.start), 'dd MMM', { locale: th })} ถึง {format(parseISO(dateRange.end), 'dd MMM yyyy', { locale: th })}
+                                                </span>
+                                            </>
+                                        )
                                     }
                                 </h2>
                                 <p className="text-[var(--color-coffee-500)] text-sm mt-1">

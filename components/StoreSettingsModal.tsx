@@ -1,7 +1,8 @@
 "use client";
 
-import React, { useState, useRef } from "react";
+import React, { useState, useRef, useEffect } from "react";
 import { useAuth } from "../context/AuthContext";
+import { useTour } from "../context/TourContext";
 import { Button } from "./Button";
 import { supabase } from "../lib/supabase";
 
@@ -12,6 +13,7 @@ interface StoreSettingsModalProps {
 
 export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps) {
     const { user, updateStoreSettings } = useAuth();
+    const { currentTourStep, nextStep, modalCloseEvent } = useTour();
     const [storeName, setStoreName] = useState(user?.storeName || "");
     const [address, setAddress] = useState(user?.address || "");
     const [taxType, setTaxType] = useState<'none' | 'include' | 'exclude'>(user?.taxType || 'none');
@@ -22,15 +24,43 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [isSaving, setIsSaving] = useState(false);
 
+    // Track initial modalCloseEvent value
+    const initialModalCloseEvent = useRef(modalCloseEvent);
+
+    // Close modal when tour signals to close (skip step)
+    useEffect(() => {
+        if (isOpen && modalCloseEvent > initialModalCloseEvent.current) {
+            onClose();
+        }
+    }, [modalCloseEvent, isOpen, onClose]);
+
+    // Auto-advance tour when modal opens
+    useEffect(() => {
+        if (isOpen && (currentTourStep?.id === 'open-settings' || currentTourStep?.id === 'open-dropdown')) {
+            setTimeout(() => {
+                nextStep();
+            }, 500);
+        }
+
+        // Auto-close if tour moves away from settings steps (e.g. user clicked Next)
+        if (isOpen && currentTourStep) {
+            const settingsSteps = ['open-dropdown', 'open-settings', 'store-name', 'store-address', 'store-vat', 'settings-save'];
+            if (!settingsSteps.includes(currentTourStep.id) && currentTourStep.page === "/admin/menu") {
+                onClose();
+            }
+        }
+    }, [isOpen, currentTourStep, nextStep, onClose]);
+
     // Sync state when modal opens or user changes
-    React.useEffect(() => {
+    useEffect(() => {
         if (isOpen && user) {
             setStoreName(user.storeName || "");
             setAddress(user.address || "");
             setTaxType(user.taxType || 'none');
             setVatRate(user.vatRate || 7);
+            initialModalCloseEvent.current = modalCloseEvent;
         }
-    }, [isOpen, user]);
+    }, [isOpen, user, modalCloseEvent]);
 
     if (!isOpen) return null;
 
@@ -159,6 +189,7 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
                             onChange={(e) => setStoreName(e.target.value)}
                             className="w-full p-3 rounded-lg border border-[var(--color-coffee-200)] focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                             placeholder="My Awesome Cafe"
+                            data-tour="store-name-input"
                         />
                     </div>
 
@@ -171,11 +202,12 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
                             onChange={(e) => setAddress(e.target.value)}
                             className="w-full p-3 rounded-lg border border-[var(--color-coffee-200)] focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all resize-none"
                             placeholder="123 ถนนสุขุมวิท เขตวัฒนา กรุงเทพฯ 10110"
+                            data-tour="store-address-input"
                         />
                     </div>
 
                     {/* Tax Settings */}
-                    <div className="space-y-3 pt-4 border-t border-[var(--color-coffee-100)]">
+                    <div className="space-y-3 pt-4 border-t border-[var(--color-coffee-100)]" data-tour="store-vat-setting">
                         <h3 className="text-sm font-bold text-[var(--color-coffee-900)]">การตั้งค่าภาษี (Tax & VAT)</h3>
 
                         <div className="grid grid-cols-3 gap-2">
@@ -226,7 +258,7 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
 
                 <div className="p-6 bg-[var(--color-coffee-50)] flex gap-3 justify-end sticky bottom-0 z-10 border-t border-[var(--color-coffee-100)]">
                     <Button variant="secondary" onClick={onClose} disabled={isSaving}>ยกเลิก</Button>
-                    <Button onClick={handleSave} disabled={isSaving || !storeName.trim()}>
+                    <Button onClick={handleSave} disabled={isSaving || !storeName.trim()} data-tour="settings-save">
                         {isSaving ? "กำลังบันทึก..." : "บันทึกการเปลี่ยนแปลง"}
                     </Button>
                 </div>

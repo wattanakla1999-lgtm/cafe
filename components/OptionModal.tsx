@@ -241,7 +241,7 @@ export function OptionModal({ item, isOpen, onClose, onConfirm }: OptionModalPro
 
                 {/* Footer */}
                 <div className="p-4 bg-white border-t border-[var(--color-coffee-100)] shrink-0">
-                    <Button fullWidth size="lg" onClick={handleConfirm}>
+                    <Button fullWidth size="lg" onClick={handleConfirm} data-tour="add-to-order">
                         เพิ่มลงในออเดอร์ - ฿{calculateTotal()}
                     </Button>
                 </div>

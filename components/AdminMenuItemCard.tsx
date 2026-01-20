@@ -11,8 +11,8 @@ interface AdminMenuItemCardProps {
 export function AdminMenuItemCard({ item, onEdit, onDelete, onToggleAvailability }: AdminMenuItemCardProps) {
     return (
         <div className={`bg-white rounded-xl shadow-sm border border-[var(--color-coffee-200)] flex flex-col h-full overflow-hidden hover:shadow-md transition-shadow ${!item.available ? 'opacity-75 grayscale-[0.5]' : ''}`}>
-            {/* Image Area - Fixed Height for Uniformity */}
-            <div className="h-48 w-full bg-[var(--color-coffee-50)] relative overflow-hidden group rounded-t-xl">
+            {/* Image Area - Responsive Height */}
+            <div className="h-32 md:h-48 w-full bg-[var(--color-coffee-50)] relative overflow-hidden group rounded-t-xl">
                 {item.image ? (
                     <img
                         src={item.image}
@@ -43,10 +43,10 @@ export function AdminMenuItemCard({ item, onEdit, onDelete, onToggleAvailability
             </div>
 
             {/* Content Area */}
-            <div className="p-4 flex flex-col flex-1 relative">
-                <div className="flex justify-between items-start mb-2">
-                    <h3 className="font-bold text-lg text-[var(--color-coffee-900)] leading-tight">{item.name}</h3>
-                    <span className="font-bold text-[var(--color-primary)] text-lg whitespace-nowrap ml-2">
+            <div className="p-3 md:p-4 flex flex-col flex-1 relative">
+                <div className="flex flex-col md:flex-row justify-between items-start mb-1 md:mb-2 gap-1 md:gap-0">
+                    <h3 className="font-bold text-base md:text-lg text-[var(--color-coffee-900)] leading-tight line-clamp-1 md:line-clamp-2">{item.name}</h3>
+                    <span className="font-bold text-[var(--color-primary)] text-base md:text-lg whitespace-nowrap">
                         ฿{item.price}
                     </span>
                 </div>
@@ -60,7 +60,7 @@ export function AdminMenuItemCard({ item, onEdit, onDelete, onToggleAvailability
 
                     {/* Availability Switch */}
                     <div className="flex items-center justify-between">
-                        <span className="text-xs font-bold text-[var(--color-coffee-500)] uppercase tracking-wider">สถานะ</span>
+                        <span className="text-[10px] md:text-xs font-bold text-[var(--color-coffee-500)] uppercase tracking-wider">สถานะ</span>
                         <button
                             onClick={() => onToggleAvailability(item.id, item.available)}
                             className={`relative inline-flex h-6 w-11 items-center rounded-full transition-colors focus:outline-none focus:ring-2 focus:ring-[var(--color-primary)] focus:ring-offset-2 ${item.available ? 'bg-green-500' : 'bg-gray-300'
@@ -74,18 +74,18 @@ export function AdminMenuItemCard({ item, onEdit, onDelete, onToggleAvailability
                     <div className="grid grid-cols-2 gap-2">
                         <button
                             onClick={() => onEdit(item)}
-                            className="flex items-center justify-center gap-1 py-2 px-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium transition-colors text-sm"
+                            className="flex items-center justify-center gap-1 py-1.5 md:py-2 px-2 md:px-3 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 font-medium transition-colors text-xs md:text-sm"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 md:h-4 md:w-4" viewBox="0 0 20 20" fill="currentColor">
                                 <path d="M13.586 3.586a2 2 0 112.828 2.828l-.793.793-2.828-2.828.793-.793zM11.379 5.793L3 14.172V17h2.828l8.38-8.379-2.83-2.828z" />
                             </svg>
                             แก้ไข
                         </button>
                         <button
                             onClick={() => onDelete(item.id)}
-                            className="flex items-center justify-center gap-1 py-2 px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium transition-colors text-sm"
+                            className="flex items-center justify-center gap-1 py-1.5 md:py-2 px-2 md:px-3 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 font-medium transition-colors text-xs md:text-sm"
                         >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="h-4 w-4" viewBox="0 0 20 20" fill="currentColor">
+                            <svg xmlns="http://www.w3.org/2000/svg" className="h-3 w-3 md:h-4 md:w-4" viewBox="0 0 20 20" fill="currentColor">
                                 <path fillRule="evenodd" d="M9 2a1 1 0 00-.894.553L7.382 4H4a1 1 0 000 2v10a2 2 0 002 2h8a2 2 0 002-2V6a1 1 0 100-2h-3.382l-.724-1.447A1 1 0 0011 2H9zM7 8a1 1 0 012 0v6a1 1 0 11-2 0V8zm5-1a1 1 0 00-1 1v6a1 1 0 102 0V8a1 1 0 00-1-1z" clipRule="evenodd" />
                             </svg>
                             ลบ

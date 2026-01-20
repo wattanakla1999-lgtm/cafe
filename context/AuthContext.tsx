@@ -14,6 +14,7 @@ export interface User {
     vatRate?: number;
     storeImage?: string | null;
     accessToken?: string;
+    onboardingCompleted?: boolean;
 }
 
 interface AuthContextType {
@@ -23,6 +24,7 @@ interface AuthContextType {
     register: (storeName: string, name: string, email: string, phone: string, password: string) => Promise<{ success: boolean; error?: string }>;
     logout: () => Promise<void>;
     updateStoreSettings: (updates: Partial<User>) => Promise<{ success: boolean; error?: string }>;
+    completeOnboarding: () => Promise<{ success: boolean; error?: string }>;
     isAuthenticated: boolean;
 }
 
@@ -55,30 +57,36 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 try {
                     console.log(`[Profile] 📥 Loading store (Attempt ${retryCount + 1})...`);
 
-                    const supabaseUrl = process.env.NEXT_PUBLIC_SUPABASE_URL!;
-                    const response = await fetch(
-                        `${supabaseUrl}/rest/v1/stores?user_id=eq.${authUser.id}&select=id,name,address,tax_type,vat_rate,store_image`,
-                        {
-                            method: 'GET',
-                            headers: {
-                                'apikey': process.env.NEXT_PUBLIC_SUPABASE_ANON_KEY!,
-                                'Authorization': `Bearer ${accessToken}`,
-                                'Content-Type': 'application/json'
-                            },
-                        }
-                    );
+                    let storesData: any[] | null = null;
 
-                    if (!response.ok) {
-                        if (response.status >= 500 || response.status === 429) {
-                            throw new Error(`Server error: ${response.status}`);
+                    // Try to fetch with new columns first
+                    const { data: stores, error } = await supabase
+                        .from('stores')
+                        .select('id,name,address,tax_type,vat_rate,store_image,onboarding_completed')
+                        .eq('user_id', authUser.id);
+
+                    if (error) {
+                        console.warn(`[Profile] ⚠️ Primary query failed (likely missing column), trying fallback...`, error);
+
+                        // Fallback: Fetch without 'onboarding_completed'
+                        const { data: storesFallback, error: errorFallback } = await supabase
+                            .from('stores')
+                            .select('id,name,address,tax_type,vat_rate,store_image')
+                            .eq('user_id', authUser.id);
+
+                        if (errorFallback) {
+                            if (errorFallback.code === 'PGRST301' || errorFallback.message?.includes('JWT')) {
+                                throw new Error(`Auth error: ${errorFallback.message}`);
+                            }
+                            console.error(`[Profile] ❌ Fallback query failed:`, JSON.stringify(errorFallback, null, 2));
+                            return null;
                         }
-                        console.error(`[Profile] ❌ Fetch failed: ${response.status}`);
-                        return null;
+                        storesData = storesFallback;
+                    } else {
+                        storesData = stores;
                     }
 
-                    const stores = await response.json();
-
-                    if (!stores || stores.length === 0) {
+                    if (!storesData || storesData.length === 0) {
                         console.warn(`[Profile] ⏳ Store not found yet, retrying...`);
                         retryCount++;
                         await new Promise(resolve => setTimeout(resolve, 1000));
@@ -86,7 +94,26 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                     }
 
                     // Success!
-                    const store = stores[0];
+                    const store = storesData[0];
+
+                    // Check local cache if we fell back (DB column missing) or if DB says false (update failed)
+                    let finalOnboardingCompleted = store.onboarding_completed ?? false;
+
+                    // TRUST LOCAL: If DB says false/undefined, but we have a local "true", respect the local "true"
+                    // to prevent the tour from reappearing if the DB update failed or column is missing.
+                    if (!finalOnboardingCompleted) {
+                        try {
+                            const cachedUserStr = localStorage.getItem('cafe_user');
+                            if (cachedUserStr) {
+                                const cached = JSON.parse(cachedUserStr);
+                                if (cached.id === authUser.id && cached.onboardingCompleted) {
+                                    console.log("[Profile] ⚠️ Using cached onboarding status (DB says false/missing)");
+                                    finalOnboardingCompleted = true;
+                                }
+                            }
+                        } catch (e) { /* ignore json parse error */ }
+                    }
+
                     const profile: User = {
                         id: authUser.id,
                         email: authUser.email!,
@@ -96,7 +123,8 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         address: store.address,
                         taxType: store.tax_type as 'none' | 'include' | 'exclude',
                         vatRate: store.vat_rate,
-                        storeImage: store.store_image
+                        storeImage: store.store_image,
+                        onboardingCompleted: finalOnboardingCompleted
                     };
 
                     console.log("[Profile] ✅ Success:", profile.email);
@@ -183,8 +211,11 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         init();
 
         // 3. Listen for changes (runs in parallel/subsequent)
+        // CRITICAL: DO NOT use async/await inside onAuthStateChange callback!
+        // This causes Supabase client deadlock when browser tab returns from inactive state.
+        // See: https://github.com/supabase/supabase-js/issues/...
         const { data: { subscription } } = supabase.auth.onAuthStateChange(
-            async (event, session) => {
+            (event, session) => {
                 console.log(`[Auth] 🔔 Event: ${event}, has session:`, !!session);
                 if (!mounted) return;
 
@@ -206,19 +237,29 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 }
 
                 // Handle all session-present events: login, refresh, and CRITICAL: initial session on mount
+                // Use setTimeout to defer async operations OUTSIDE the callback to prevent deadlock
                 if (event === "SIGNED_IN" || event === "TOKEN_REFRESHED" || event === "INITIAL_SESSION") {
                     if (session?.user && session?.access_token) {
-                        console.log(`[Auth] Event ${event}: Loading profile from listener...`);
-                        const profile = await loadStoreProfile(session.user, session.access_token);
-                        if (mounted) {
-                            if (profile) {
-                                console.log(`[Auth] ✅ Profile loaded via ${event}`);
-                                setUser(profile);
-                                localStorage.setItem('cafe_user', JSON.stringify(profile));
-                            } else {
-                                console.error(`[Auth] ❌ Profile load failed via ${event}`);
+                        console.log(`[Auth] Event ${event}: Deferring profile load to avoid deadlock...`);
+
+                        // DEFER the async operation outside the callback
+                        setTimeout(async () => {
+                            if (!mounted) return;
+                            try {
+                                const profile = await loadStoreProfile(session.user, session.access_token);
+                                if (mounted) {
+                                    if (profile) {
+                                        console.log(`[Auth] ✅ Profile loaded via ${event}`);
+                                        setUser(profile);
+                                        localStorage.setItem('cafe_user', JSON.stringify(profile));
+                                    } else {
+                                        console.error(`[Auth] ❌ Profile load failed via ${event}`);
+                                    }
+                                }
+                            } catch (err) {
+                                console.error(`[Auth] Exception loading profile via ${event}:`, err);
                             }
-                        }
+                        }, 0);
                     }
                 }
             }
@@ -361,6 +402,56 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
         }
     };
 
+    const completeOnboarding = async (): Promise<{ success: boolean; error?: string }> => {
+        if (!user?.storeId) return { success: false, error: "No store ID found" };
+
+        try {
+            console.log("[Auth] Completing onboarding...");
+
+            const { error } = await supabase
+                .from('stores')
+                .update({ onboarding_completed: true })
+                .eq('id', user.storeId);
+
+            if (error) {
+                console.error("[Auth] Onboarding complete failed (DB):", error);
+                // Fallback: Continue to update local state
+            }
+
+            // CRITICAL: Create a completely new object reference to ensure React triggers re-renders
+            // explicitly spreading properties and ensuring onboardingCompleted is the LAST override
+            const updatedUser: User = {
+                ...user,
+                onboardingCompleted: true
+            };
+
+            // 1. Update State
+            setUser(updatedUser);
+
+            // 2. Update Local Storage
+            localStorage.setItem('cafe_user', JSON.stringify(updatedUser));
+
+            // Force a small timeout to ensure propagation if needed (rarely needed but safe)
+            setTimeout(() => {
+                const checkUser = localStorage.getItem('cafe_user');
+                console.log("[Auth] Double checking storage:", checkUser);
+            }, 100);
+
+            console.log("[Auth] ✅ Onboarding completed (Local state updated force)");
+            return { success: true };
+        } catch (error: any) {
+            console.error("[Auth] Onboarding exception:", error);
+
+            // Even on exception, try to update local state
+            if (user) {
+                const updatedUser: User = { ...user, onboardingCompleted: true };
+                setUser(updatedUser);
+                localStorage.setItem('cafe_user', JSON.stringify(updatedUser));
+            }
+            return { success: false, error: error.message };
+        }
+    };
+
     return (
         <AuthContext.Provider
             value={{
@@ -370,6 +461,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                 register,
                 logout,
                 updateStoreSettings,
+                completeOnboarding,
                 isAuthenticated: !!user
             }}
         >

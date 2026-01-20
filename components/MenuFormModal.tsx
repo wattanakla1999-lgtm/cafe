@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from "react";
+import React, { useState, useEffect, useRef } from "react";
 import { useMenu } from "../context/MenuContext";
 import { MenuItem, Category } from "../data/mock";
 import { Button } from "./Button";
+import { useTour } from "../context/TourContext";
 import { Combobox } from "./Combobox";
 import { supabase } from "../lib/supabase";
 import { compressImage } from "../lib/image-utils";
@@ -16,6 +17,7 @@ interface MenuFormModalProps {
 
 export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFormModalProps) {
     const { menuItems, categories, toppings, addCategory, addTopping, servingTypes } = useMenu();
+    const { isActive, currentTourStep, nextStep } = useTour();
 
     const [formData, setFormData] = useState<Omit<MenuItem, "id">>({
         name: "",
@@ -80,6 +82,45 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
             setUploading(false);
         }
     }, [isOpen, initialData]);
+
+    // Auto-advance tour when modal opens
+    useEffect(() => {
+        if (isOpen && currentTourStep?.id === 'add-menu') {
+            setTimeout(() => {
+                nextStep();
+            }, 500);
+        }
+
+        // Auto-close if tour moves away from menu form steps
+        if (isOpen && currentTourStep) {
+            const menuSteps = ['add-menu', 'menu-name', 'menu-price', 'menu-category', 'create-category-start', 'create-category-input', 'create-category-confirm', 'menu-save'];
+            if (!menuSteps.includes(currentTourStep.id) && currentTourStep.page === "/admin/menu") {
+                onClose();
+            }
+        }
+    }, [isOpen, currentTourStep, nextStep, onClose]);
+
+    // Tour Integration: Auto-fill data for demo purposes
+    useEffect(() => {
+        if (!isActive || !currentTourStep || !isOpen) return;
+
+        if (currentTourStep.id === "menu-name") {
+            if (!formData.name) {
+                setFormData(prev => ({ ...prev, name: "อเมริกาโน่เย็น" }));
+            }
+        }
+        else if (currentTourStep.id === "menu-price") {
+            if (!formData.price || formData.price === 0) {
+                setFormData(prev => ({ ...prev, price: 60 }));
+                setPriceInput("60");
+            }
+        }
+        else if (currentTourStep.id === "create-category-input") {
+            if (!newCategoryName) {
+                setNewCategoryName("Coffee");
+            }
+        }
+    }, [isActive, currentTourStep, isOpen, formData.name, formData.price, newCategoryName]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         if (e.target.files && e.target.files[0]) {
@@ -240,6 +281,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                             onChange={e => setFormData({ ...formData, name: e.target.value })}
                             className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                             placeholder="เช่น ลาเต้เย็น"
+                            data-tour="menu-name-input"
                         />
                     </div>
 
@@ -261,10 +303,11 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                             }}
                             className="w-full p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                             placeholder="ระบุราคา"
+                            data-tour="menu-price-input"
                         />
                     </div>
 
-                    <div>
+                    <div data-tour="menu-category-select">
                         <div className="flex items-center justify-between mb-1">
                             <label className="block text-sm font-bold text-[var(--color-coffee-700)]">หมวดหมู่</label>
                             {!showQuickCategoryAdd && (
@@ -272,6 +315,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                                     type="button"
                                     onClick={() => setShowQuickCategoryAdd(true)}
                                     className="text-xs text-[var(--color-primary)] hover:text-[var(--color-coffee-800)] hover:underline font-medium flex items-center gap-1 transition-colors"
+                                    data-tour="create-category-btn"
                                 >
                                     <svg xmlns="http://www.w3.org/2000/svg" className="h-3.5 w-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4v16m8-8H4" />
@@ -292,6 +336,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                                         maxLength={50}
                                         className="flex-1 p-2.5 border border-[var(--color-coffee-300)] rounded-lg focus:ring-2 focus:ring-[var(--color-primary)] outline-none transition-all"
                                         autoFocus
+                                        data-tour="new-category-input"
                                     />
                                     <button
                                         type="button"
@@ -309,6 +354,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                                             }
                                         }}
                                         className="px-4 py-2.5 bg-[var(--color-primary)] text-white rounded-lg cursor-pointer transition-colors font-medium"
+                                        data-tour="new-category-confirm"
                                     >
                                         เพิ่ม
                                     </button>
@@ -567,7 +613,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                         <Button type="button" variant="outline" fullWidth onClick={onClose} className="py-3" disabled={uploading}>
                             ยกเลิก
                         </Button>
-                        <Button type="submit" variant="primary" fullWidth className="py-3 shadow-lg shadow-orange-200" disabled={uploading}>
+                        <Button type="submit" variant="primary" fullWidth className="py-3 shadow-lg shadow-orange-200" disabled={uploading} data-tour="menu-save">
                             {uploading ? (
                                 <span className="flex items-center gap-2">
                                     <svg className="animate-spin h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">

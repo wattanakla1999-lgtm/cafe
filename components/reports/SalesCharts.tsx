@@ -37,7 +37,7 @@ export function SalesCharts({ salesTrend, categoryDistribution, range }: SalesCh
                 <h3 className="text-lg font-bold text-[var(--color-coffee-900)] mb-4">
                     แนวโน้มยอดขาย ({isToday ? "รายชั่วโมง" : "รายวัน"})
                 </h3>
-                <div className="h-64 w-full">
+                <div className="h-72 md:h-80 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <LineChart data={salesTrend}>
                             <CartesianGrid strokeDasharray="3 3" vertical={false} stroke="#E5E7EB" />
@@ -76,7 +76,7 @@ export function SalesCharts({ salesTrend, categoryDistribution, range }: SalesCh
                 <h3 className="text-lg font-bold text-[var(--color-coffee-900)] mb-4">
                     ยอดขายตามหมวดหมู่
                 </h3>
-                <div className="h-64 w-full">
+                <div className="h-72 md:h-80 w-full">
                     <ResponsiveContainer width="100%" height="100%">
                         <PieChart>
                             <Pie
