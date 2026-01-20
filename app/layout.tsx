@@ -32,6 +32,9 @@ export const metadata: Metadata = {
     index: true,
     follow: true,
   },
+  verification: {
+    google: "OfLgQw2PPxAMX4atBuGqcAycRIkoMY0x-ltAUNWIgU8",
+  },
 };
 
 import { Providers } from "../components/Providers";
