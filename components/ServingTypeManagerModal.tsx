@@ -12,7 +12,7 @@ interface ServingTypeManagerModalProps {
 }
 
 export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerModalProps) {
-    const { servingTypes, addServingType, updateServingType, deleteServingType } = useMenu();
+    const { servingTypes, addServingType, updateServingType, deleteServingType, refetchMenu } = useMenu();
     const { confirm } = useConfirm();
 
     const [mode, setMode] = useState<"list" | "edit" | "add">("list");
@@ -28,8 +28,9 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
             setError("");
             setFormData({ name: "", price: 0 });
             setPriceInput("");
+            refetchMenu({ page: 0 });
         }
-    }, [isOpen]);
+    }, [isOpen, refetchMenu]);
 
     if (!isOpen) return null;
 

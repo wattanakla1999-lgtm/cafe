@@ -12,7 +12,7 @@ interface ToppingManagerModalProps {
 }
 
 export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProps) {
-    const { toppings, addTopping, updateTopping, deleteTopping } = useMenu();
+    const { toppings, addTopping, updateTopping, deleteTopping, refetchMenu } = useMenu();
     const { confirm } = useConfirm();
     const [editingTopping, setEditingTopping] = useState<Option | null>(null);
     const [newName, setNewName] = useState("");
@@ -20,14 +20,15 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
     const [mode, setMode] = useState<"list" | "edit" | "add">("list");
     const [error, setError] = useState("");
 
-    // Reset when modal opens
+    // Reset and refetch when modal opens
     useEffect(() => {
         if (isOpen) {
             setMode("list");
             setEditingTopping(null);
             setError("");
+            refetchMenu({ page: 0 });
         }
-    }, [isOpen]);
+    }, [isOpen, refetchMenu]);
 
     if (!isOpen) return null;
 

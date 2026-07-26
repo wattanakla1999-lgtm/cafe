@@ -12,7 +12,7 @@ interface DiscountManagerModalProps {
 }
 
 export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalProps) {
-    const { discounts, addDiscount, updateDiscount, deleteDiscount } = useMenu();
+    const { discounts, addDiscount, updateDiscount, deleteDiscount, refetchMenu } = useMenu();
     const { confirm } = useConfirm();
 
     // State
@@ -24,14 +24,15 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
     const [type, setType] = useState<"percent" | "amount">("percent");
     const [error, setError] = useState("");
 
-    // Reset when modal opens
+    // Reset and refetch when modal opens
     useEffect(() => {
         if (isOpen) {
             setMode("list");
             setEditingDiscount(null);
             setError("");
+            refetchMenu({ page: 0 });
         }
-    }, [isOpen]);
+    }, [isOpen, refetchMenu]);
 
     if (!isOpen) return null;
 

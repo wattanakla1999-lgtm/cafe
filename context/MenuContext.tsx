@@ -209,36 +209,22 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
                 setHasMore(loadedItems.length === ITEMS_PER_PAGE);
                 setPage(nextPage);
 
-                // 3. Fetch Discounts, Options (Only on initial load, skip when just filtering)
+                // 3. Fetch Discounts, Serving Types & Toppings (Only on initial load or reset)
                 if (isReset && !params.onlyMenuItems) {
-                    const { data: discountData } = await supabase
-                        .from("discounts")
-                        .select("id, name, type, value, active")
-                        .eq("store_id", targetStoreId);
+                    const [
+                        { data: discountData },
+                        { data: stData },
+                        { data: tpData }
+                    ] = await Promise.all([
+                        supabase.from("discounts").select("id, name, type, value, active").eq("store_id", targetStoreId),
+                        supabase.from("serving_types").select("id, name, price").eq("store_id", targetStoreId).order("price"),
+                        supabase.from("toppings").select("id, name, price").eq("store_id", targetStoreId).order("price")
+                    ]);
 
-                    if (activeFetchIdRef.current === currentFetchId && discountData) {
-                        setDiscounts(discountData);
-                    }
-
-                    // 4. Fetch Options
-                    const { data: stData } = await supabase
-                        .from("serving_types")
-                        .select("id, name, price")
-                        .eq("store_id", targetStoreId)
-                        .order("price");
-
-                    if (activeFetchIdRef.current === currentFetchId && stData) {
-                        setServingTypes(stData);
-                    }
-
-                    const { data: tpData } = await supabase
-                        .from("toppings")
-                        .select("id, name, price")
-                        .eq("store_id", targetStoreId)
-                        .order("price");
-
-                    if (activeFetchIdRef.current === currentFetchId && tpData) {
-                        setToppings(tpData);
+                    if (activeFetchIdRef.current === currentFetchId) {
+                        if (discountData) setDiscounts(discountData);
+                        if (stData) setServingTypes(stData);
+                        if (tpData) setToppings(tpData);
                     }
                 }
             };
@@ -252,10 +238,8 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
         } catch (error) {
             if (activeFetchIdRef.current === currentFetchId) {
                 console.error("[MenuContext] Error fetching menu data:", error);
-                // Optionally show toast or UI error
             }
         } finally {
-            // Only turn off loading if this is still the active request
             if (activeFetchIdRef.current === currentFetchId) {
                 setIsLoading(false);
                 setIsFetchingMore(false);
@@ -265,10 +249,20 @@ export function MenuProvider({ children }: { children: React.ReactNode }) {
 
     // Initialize menu - call this from pages that need menu data
     const initializeMenu = useCallback(async () => {
-        if (hasFetched) return; // Already fetched
+        const targetStoreId = user?.storeId || publicStoreId;
+        if (!targetStoreId) return; // Do not mark as fetched until storeId is ready
+        if (hasFetched) return;
         setHasFetched(true);
         await fetchMenuData({ page: 0 });
-    }, [fetchMenuData, hasFetched]);
+    }, [user?.storeId, publicStoreId, fetchMenuData, hasFetched]);
+
+    // Auto-fetch data as soon as user storeId resolves
+    useEffect(() => {
+        if (user?.storeId) {
+            setHasFetched(true);
+            fetchMenuData({ page: 0 });
+        }
+    }, [user?.storeId]);
 
     // Reset loading state when tab becomes visible (handles stuck loading after tab switch)
     useEffect(() => {
