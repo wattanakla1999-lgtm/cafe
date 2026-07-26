@@ -101,9 +101,6 @@ export default function CounterPage() {
         // Reset search and category to defaults when returning to page
         setSearchTerm("");
         setActiveCategory("All");
-
-        // Reset menu view with explicit empty search and All category
-        refetchMenu({ search: "", category: "All", includeUnavailable: false });
     }, [user?.storeId]);
 
     // Calculate best seller rankings
@@ -149,6 +146,24 @@ export default function CounterPage() {
         return () => clearTimeout(timer);
     }, [searchTerm, activeCategory, refetchMenu]);
 
+    // Handle opening Queue tab directly via notification click or ?tab=queue URL param
+    React.useEffect(() => {
+        const handleOpenQueue = () => {
+            setActiveTab("queue");
+            setIsQueueOpen(true);
+        };
+
+        if (typeof window !== "undefined") {
+            const params = new URLSearchParams(window.location.search);
+            if (params.get("tab") === "queue") {
+                handleOpenQueue();
+            }
+        }
+
+        window.addEventListener("open-queue-tab", handleOpenQueue);
+        return () => window.removeEventListener("open-queue-tab", handleOpenQueue);
+    }, []);
+
     // Fetch Suggestions
     React.useEffect(() => {
         if (!searchTerm || searchTerm.length < 2) {
@@ -193,25 +208,10 @@ export default function CounterPage() {
         // useEffect will handle refetch
     };
 
-    // Sort items: Best sellers first (by rank), then others
+    // Keep menu items in stable, consistent order to prevent screen stutter/jumping after mount
     const filteredItems = useMemo(() => {
-        return [...menuItems].sort((a, b) => {
-            const rankA = bestSellerRankings.get(a.id);
-            const rankB = bestSellerRankings.get(b.id);
-
-            // Both have ranks - sort by rank ascending (1, 2, 3, ...)
-            if (rankA && rankB) return rankA - rankB;
-
-            // Only A has rank - A comes first
-            if (rankA) return -1;
-
-            // Only B has rank - B comes first
-            if (rankB) return 1;
-
-            // Neither has rank - maintain original order
-            return 0;
-        });
-    }, [menuItems, bestSellerRankings]);
+        return menuItems;
+    }, [menuItems]);
 
     const subtotal = cart.reduce((sum, item) => sum + item.totalPrice, 0);
 

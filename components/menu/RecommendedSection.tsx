@@ -30,7 +30,7 @@ export function RecommendedSection({ items, onItemClick }: RecommendedSectionPro
             </div>
 
             {/* Horizontal Scrollable Grid */}
-            <div className="overflow-x-auto hide-scrollbar -mx-4 px-4">
+            <div className="w-full overflow-x-auto hide-scrollbar">
                 <div className="flex gap-4 pb-2" style={{ minWidth: 'min-content' }}>
                     {recommendedItems.map((item) => (
                         <div key={item.id} className="relative" style={{ minWidth: '160px', maxWidth: '160px' }}>

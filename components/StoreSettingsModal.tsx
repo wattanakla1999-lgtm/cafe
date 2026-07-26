@@ -89,7 +89,7 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
 
                     const { error: uploadError } = await supabase.storage
                         .from('menu-images')
-                        .upload(filePath, file);
+                        .upload(filePath, file, { upsert: true });
 
                     if (uploadError) {
                         throw uploadError;
@@ -99,15 +99,16 @@ export function StoreSettingsModal({ isOpen, onClose }: StoreSettingsModalProps)
                         .from('menu-images')
                         .getPublicUrl(filePath);
 
-                    // We will save this URL on 'Save' click or maybe immediately?
-                    // Better to save immediately to state so handleSave picks it up, 
-                    // but we need to distinguish between "preview blob" and "uploaded url".
-                    // Let's store uploadedUrl in state.
                     setUploadedImageUrl(publicUrl);
 
-                } catch (error) {
+                } catch (error: any) {
                     console.error("Error uploading image:", error);
-                    alert("เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ");
+                    const errorMsg = error?.message || '';
+                    if (errorMsg.toLowerCase().includes('bucket not found') || error?.statusCode === 400 || error?.status === 400) {
+                        alert("ไม่พบ Bucket 'menu-images' ใน Supabase Storage\n\nกรุณาสร้าง Bucket ชื่อ 'menu-images' (ตั้งเป็น Public) ใน Supabase Dashboard หรือรันคำสั่ง SQL ที่เตรียมไว้ให้ครับ");
+                    } else {
+                        alert(`เกิดข้อผิดพลาดในการอัปโหลดรูปภาพ: ${errorMsg || 'กรุณาลองใหม่อีกครั้ง'}`);
+                    }
                 }
             }
         }

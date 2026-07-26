@@ -6,10 +6,12 @@ import { Button } from "../components/Button";
 import { useAuth } from "../context/AuthContext";
 import { OrderQRModal } from "../components/OrderQRModal";
 import { useTour } from "../context/TourContext";
+import { useLoading } from "../context/LoadingContext";
 
 export default function Home() {
   const { user, logout, isLoading } = useAuth();
   const { isActive, startTour, currentTourStep } = useTour();
+  const { showLoading, hideLoading } = useLoading();
   const [isQrOpen, setIsQrOpen] = useState(false);
   const [showLogoutConfirm, setShowLogoutConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
@@ -41,6 +43,7 @@ export default function Home() {
 
   const handleLogout = async () => {
     setIsLoggingOut(true);
+    showLoading("กำลังออกจากระบบ...");
     await logout();
   };
 
@@ -71,7 +74,17 @@ export default function Home() {
 
           {/* Public Area */}
           <div className="pt-4">
-            <Button fullWidth variant="outline" onClick={() => setIsQrOpen(true)}>
+            <Button
+              fullWidth
+              variant="outline"
+              onClick={() => {
+                showLoading("กำลังโหลด QRCode...");
+                setTimeout(() => {
+                  hideLoading();
+                  setIsQrOpen(true);
+                }, 300);
+              }}
+            >
               แสดง QRCode เพื่อสั่งเมนู
             </Button>
           </div>
@@ -79,12 +92,12 @@ export default function Home() {
           {!user ? (
             /* Guest View */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
-              <Link href="/login">
+              <Link href="/login" onClick={() => showLoading("กำลังโหลดหน้าเข้าสู่ระบบ...")}>
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
                   เข้าสู่ระบบร้านค้า
                 </Button>
               </Link>
-              <Link href="/register">
+              <Link href="/register" onClick={() => showLoading("กำลังโหลดหน้าสมัครสมาชิก...")}>
                 <Button fullWidth variant="ghost">
                   สร้างร้านค้าใหม่
                 </Button>
@@ -93,14 +106,14 @@ export default function Home() {
           ) : (
             /* Logged In / Store View */
             <div className="space-y-4 pt-4 border-t border-[var(--color-coffee-200)]">
-              <Link href="/counter" data-tour="counter-button">
+              <Link href="/counter" data-tour="counter-button" onClick={() => showLoading("กำลังเปิดจุดชำระเงิน...")}>
                 <Button fullWidth size="lg" variant="primary" className="shadow-lg shadow-orange-200">
                   เปิดจุดชำระเงิน
                 </Button>
               </Link>
 
               <div className="pt-4 gap-4" data-tour="reports-button">
-                <Link href="/reports">
+                <Link href="/reports" onClick={() => showLoading("กำลังโหลดรายงาน...")}>
                   <Button fullWidth variant="outline">
                     รายงาน
                   </Button>
@@ -108,7 +121,7 @@ export default function Home() {
               </div>
 
               <div data-tour="menu-button">
-                <Link href="/admin/menu">
+                <Link href="/admin/menu" onClick={() => showLoading("กำลังโหลดหน้าจัดการเมนู...")}>
                   <Button fullWidth variant="outline">
                     จัดการเมนู
                   </Button>

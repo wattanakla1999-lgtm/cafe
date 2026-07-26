@@ -49,7 +49,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
             return profileFetchPromiseRef.current;
         }
 
-        const fetchLogic = async () => {
+        const fetchLogic = async (): Promise<User> => {
             let retryCount = 0;
             const maxRetries = 3;
 
@@ -66,7 +66,7 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         .eq('user_id', authUser.id);
 
                     if (error) {
-                        console.warn(`[Profile] ⚠️ Primary query failed (likely missing column), trying fallback...`, error);
+                        console.warn(`[Profile] ⚠️ Primary query failed:`, error.message);
 
                         // Fallback: Fetch without 'onboarding_completed'
                         const { data: storesFallback, error: errorFallback } = await supabase
@@ -74,61 +74,85 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                             .select('id,name,address,tax_type,vat_rate,store_image')
                             .eq('user_id', authUser.id);
 
-                        if (errorFallback) {
-                            if (errorFallback.code === 'PGRST301' || errorFallback.message?.includes('JWT')) {
-                                throw new Error(`Auth error: ${errorFallback.message}`);
-                            }
-                            console.error(`[Profile] ❌ Fallback query failed:`, JSON.stringify(errorFallback, null, 2));
-                            return null;
+                        if (!errorFallback && storesFallback) {
+                            storesData = storesFallback;
                         }
-                        storesData = storesFallback;
                     } else {
                         storesData = stores;
                     }
 
                     if (!storesData || storesData.length === 0) {
-                        console.warn(`[Profile] ⏳ Store not found yet, retrying...`);
-                        retryCount++;
-                        await new Promise(resolve => setTimeout(resolve, 1000));
-                        continue;
+                        if (retryCount < maxRetries - 1) {
+                            console.warn(`[Profile] ⏳ Store not found yet, retrying...`);
+                            retryCount++;
+                            await new Promise(resolve => setTimeout(resolve, 1000));
+                            continue;
+                        }
+
+                        // Auto-create store if not found after retries
+                        console.log(`[Profile] 🛠️ Store profile missing in DB. Auto-creating store for user...`);
+                        const storeName = authUser.user_metadata?.store_name || "My Cafe";
+                        const { data: newStore, error: createError } = await supabase
+                            .from('stores')
+                            .insert({
+                                user_id: authUser.id,
+                                name: storeName,
+                                onboarding_completed: false
+                            })
+                            .select('id,name,address,tax_type,vat_rate,store_image,onboarding_completed')
+                            .single();
+
+                        if (createError) {
+                            console.error(`[Profile] ⚠️ Could not auto-create store in DB:`, createError.message);
+                        } else if (newStore) {
+                            storesData = [newStore];
+                        }
                     }
 
-                    // Success!
-                    const store = storesData[0];
+                    // Success with DB store!
+                    if (storesData && storesData.length > 0) {
+                        const store = storesData[0];
 
-                    // Check local cache if we fell back (DB column missing) or if DB says false (update failed)
-                    let finalOnboardingCompleted = store.onboarding_completed ?? false;
-
-                    // TRUST LOCAL: If DB says false/undefined, but we have a local "true", respect the local "true"
-                    // to prevent the tour from reappearing if the DB update failed or column is missing.
-                    if (!finalOnboardingCompleted) {
-                        try {
-                            const cachedUserStr = localStorage.getItem('cafe_user');
-                            if (cachedUserStr) {
-                                const cached = JSON.parse(cachedUserStr);
-                                if (cached.id === authUser.id && cached.onboardingCompleted) {
-                                    console.log("[Profile] ⚠️ Using cached onboarding status (DB says false/missing)");
-                                    finalOnboardingCompleted = true;
+                        let finalOnboardingCompleted = store.onboarding_completed ?? false;
+                        if (!finalOnboardingCompleted) {
+                            try {
+                                const cachedUserStr = localStorage.getItem('cafe_user');
+                                if (cachedUserStr) {
+                                    const cached = JSON.parse(cachedUserStr);
+                                    if (cached.id === authUser.id && cached.onboardingCompleted) {
+                                        finalOnboardingCompleted = true;
+                                    }
                                 }
-                            }
-                        } catch (e) { /* ignore json parse error */ }
+                            } catch (e) { /* ignore json parse error */ }
+                        }
+
+                        const profile: User = {
+                            id: authUser.id,
+                            email: authUser.email!,
+                            storeName: store.name || "My Cafe",
+                            storeId: store.id,
+                            accessToken: accessToken,
+                            address: store.address,
+                            taxType: store.tax_type as 'none' | 'include' | 'exclude',
+                            vatRate: store.vat_rate,
+                            storeImage: store.store_image,
+                            onboardingCompleted: finalOnboardingCompleted
+                        };
+
+                        console.log("[Profile] ✅ Success loading store from DB:", profile.email);
+                        return profile;
                     }
 
-                    const profile: User = {
+                    // Fallback profile if DB store not created yet
+                    console.log("[Profile] 💡 Using default store profile fallback");
+                    return {
                         id: authUser.id,
                         email: authUser.email!,
-                        storeName: store.name || "Unknown Store",
-                        storeId: store.id,
+                        storeName: authUser.user_metadata?.store_name || "My Cafe",
+                        storeId: authUser.id,
                         accessToken: accessToken,
-                        address: store.address,
-                        taxType: store.tax_type as 'none' | 'include' | 'exclude',
-                        vatRate: store.vat_rate,
-                        storeImage: store.store_image,
-                        onboardingCompleted: finalOnboardingCompleted
+                        onboardingCompleted: false
                     };
-
-                    console.log("[Profile] ✅ Success:", profile.email);
-                    return profile;
 
                 } catch (error: any) {
                     console.error(`[Profile] ❌ Exception:`, error);
@@ -137,10 +161,18 @@ export function AuthProvider({ children }: { children: React.ReactNode }) {
                         await new Promise(resolve => setTimeout(resolve, 1000));
                         continue;
                     }
-                    return null;
                 }
             }
-            return null;
+
+            // Guaranteed fallback profile
+            return {
+                id: authUser.id,
+                email: authUser.email!,
+                storeName: authUser.user_metadata?.store_name || "My Cafe",
+                storeId: authUser.id,
+                accessToken: accessToken,
+                onboardingCompleted: false
+            };
         };
 
         const fetchPromise = fetchLogic().finally(() => {

@@ -55,9 +55,12 @@ export function GlobalOrderAlert() {
     }, [incomingOrder, setIncomingOrder]);
 
     const handleAlertClick = () => {
-        if (pathname !== '/counter') {
-            router.push('/counter');
-            setAlertInfo(null); // Dismiss after clicking
+        setAlertInfo(null); // Close alert pop-up immediately
+
+        if (pathname === '/counter') {
+            window.dispatchEvent(new CustomEvent("open-queue-tab"));
+        } else {
+            router.push('/counter?tab=queue');
         }
     };
 
@@ -68,9 +71,9 @@ export function GlobalOrderAlert() {
             severity="success"
             message={alertInfo.message}
             description={alertInfo.description}
-            autoCloseDuration={5000}
+            autoCloseDuration={8000}
             onClose={() => setAlertInfo(null)}
-            onClick={pathname !== '/counter' ? handleAlertClick : undefined}
+            onClick={handleAlertClick}
         />
     );
 }

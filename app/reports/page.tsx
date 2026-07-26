@@ -75,15 +75,18 @@ export default function ReportsPage() {
                 // 1. Fetch Orders for Summary
                 const { data: orders, error: ordersError } = await supabase
                     .from("orders")
-                    .select("id, total_amount, status, created_at, payment_method, channel")
+                    .select("id, total_amount, status, created_at, channel")
                     .eq("store_id", user.storeId)
                     .gte("created_at", startISO)
                     .lte("created_at", endISO)
                     .neq("status", "cancelled");
 
-                if (ordersError) throw ordersError;
+                if (ordersError) {
+                    console.error("Summary Orders Fetch Error:", ordersError.message || ordersError);
+                    throw ordersError;
+                }
 
-                const validOrders = orders.filter(o => o.status === 'completed' || o.status === 'pending');
+                const validOrders = (orders || []).filter(o => o.status === 'completed' || o.status === 'pending');
 
                 // 2. Fetch Items for Summary (Top Sellers etc)
                 const orderIds = validOrders.map(o => o.id);
@@ -91,16 +94,40 @@ export default function ReportsPage() {
                 if (orderIds.length > 0) {
                     const { data: items, error: itemsError } = await supabase
                         .from("order_items")
-                        .select(`
-                            *,
-                            menu_item:menu_items (
-                                category_id,
-                                category:categories(name)
-                            )
-                        `)
+                        .select("id, order_id, menu_item_id, name, quantity, total_price")
                         .in("order_id", orderIds);
-                    if (itemsError) throw itemsError;
-                    orderItems = items;
+
+                    if (itemsError) {
+                        console.warn("Summary Items Fetch Warning:", itemsError.message || itemsError);
+                    } else if (items) {
+                        orderItems = items;
+                    }
+                }
+
+                // Fetch Categories for category distribution
+                let categoryIdMap = new Map<string, string>();
+                const { data: categoriesData } = await supabase
+                    .from("categories")
+                    .select("id, name")
+                    .eq("store_id", user.storeId);
+                
+                if (categoriesData) {
+                    categoriesData.forEach(c => categoryIdMap.set(c.id, c.name));
+                }
+
+                // Fetch Menu Items for category mapping
+                let menuCategoryMap = new Map<string, string>();
+                const { data: menuItemsData } = await supabase
+                    .from("menu_items")
+                    .select("id, category_id")
+                    .eq("store_id", user.storeId);
+                
+                if (menuItemsData) {
+                    menuItemsData.forEach(m => {
+                        if (m.category_id && categoryIdMap.has(m.category_id)) {
+                            menuCategoryMap.set(m.id, categoryIdMap.get(m.category_id)!);
+                        }
+                    });
                 }
 
                 // --- CALCS ---
@@ -111,7 +138,7 @@ export default function ReportsPage() {
                 orderItems.forEach(item => {
                     const name = item.name;
                     const qty = item.quantity;
-                    const revenue = Number(item.total_price);
+                    const revenue = Number(item.total_price || 0);
                     if (itemMap.has(name)) {
                         const existing = itemMap.get(name);
                         itemMap.set(name, { ...existing, sold: existing.sold + qty, revenue: existing.revenue + revenue });
@@ -124,7 +151,7 @@ export default function ReportsPage() {
                 }));
                 const topItem = topSellers.length > 0 ? topSellers[0].name : "N/A";
 
-                const totalSales = validOrders.reduce((sum, o) => sum + Number(o.total_amount), 0);
+                const totalSales = validOrders.reduce((sum, o) => sum + Number(o.total_amount || 0), 0);
                 const totalOrders = validOrders.length;
                 const avgOrderValue = totalOrders > 0 ? totalSales / totalOrders : 0;
 
@@ -135,22 +162,22 @@ export default function ReportsPage() {
                 validOrders.forEach(o => {
                     const date = parseISO(o.created_at);
                     let key = dateRange.start === dateRange.end ? format(date, "HH:00") : format(date, "MMM dd");
-                    trendMap.set(key, (trendMap.get(key) || 0) + Number(o.total_amount));
+                    trendMap.set(key, (trendMap.get(key) || 0) + Number(o.total_amount || 0));
                 });
                 const salesTrend = Array.from(trendMap.entries()).map(([k, v]) => ({ name: k, sales: v })).sort((a, b) => a.name.localeCompare(b.name));
 
                 // Categories
                 const catMap = new Map();
                 orderItems.forEach(item => {
-                    const catName = item.menu_item?.category?.name || "Uncategorized";
-                    catMap.set(catName, (catMap.get(catName) || 0) + Number(item.total_price));
+                    const catName = (item.menu_item_id && menuCategoryMap.get(item.menu_item_id)) || "ทั่วไป";
+                    catMap.set(catName, (catMap.get(catName) || 0) + Number(item.total_price || 0));
                 });
                 const categoryDistribution = Array.from(catMap.entries()).map(([k, v]) => ({ name: k, value: v }));
 
                 setData({ summary, salesTrend, categoryDistribution, topSellers });
 
-            } catch (error) {
-                console.error("Summary Fetch Error:", error);
+            } catch (error: any) {
+                console.error("Summary Fetch Exception:", error?.message || error);
             } finally {
                 setIsLoading(false);
             }
@@ -177,30 +204,17 @@ export default function ReportsPage() {
                 const from = (currentPage - 1) * 10;
                 const to = from + 9;
 
-                // 1. Get Orders (Paginated)
+                // 1. Get Orders (Paginated) - Safe select without optional un-migrated columns
                 let query = supabase
                     .from("orders")
-                    .select("id, created_at, total_amount, channel, status, payment_method, cancel_reason", { count: "exact" })
+                    .select("id, created_at, total_amount, channel, status", { count: "exact" })
                     .eq("store_id", user.storeId)
                     .gte("created_at", startISO)
                     .lte("created_at", endISO)
                     .order("created_at", { ascending: false });
 
-                // Apply Filters
-                // Temporarily disabled: UUID search requires text casting which Supabase JS doesn't support well
-                // Users can still filter by status and channel
-                // TODO: Consider adding a separate indexed text column for order IDs if search is critical
-                /* if (debouncedId) {
-                    query = query.filter('id::text', 'ilike', `%${debouncedId}%`);
-                } */
                 if (filterStatus !== "all") {
                     if (filterStatus === "pending") {
-                        // "pending" in filter means active orders (pending, cooking, ready)
-                        // OR just literally 'pending'? User request said "Status", usually implies granular.
-                        // But usually "Pending/Procesing" vs "Completed" vs "Cancelled".
-                        // Let's assume matching the dropdown I made: "pending" value in dropdown -> match pending, cooking, ready?
-                        // The dropdown has: Completed, Cancelled, Pending (waiting/cooking).
-                        // Let's map "pending" filter to pending, cooking, ready.
                         query = query.in("status", ["pending", "cooking", "ready"]);
                     } else {
                         query = query.eq("status", filterStatus);
@@ -213,7 +227,10 @@ export default function ReportsPage() {
                 // Range
                 const { data: orders, count, error } = await query.range(from, to);
 
-                if (error) throw error;
+                if (error) {
+                    console.error("Transactions Query Error:", error.message || error);
+                    throw error;
+                }
                 setTotalCount(count || 0);
 
                 if (orders && orders.length > 0) {
@@ -234,11 +251,11 @@ export default function ReportsPage() {
                             time: format(parseISO(o.created_at), "HH:mm"),
                             menuName: menuNames || "Unknown",
                             quantity: totalQty,
-                            total: Number(o.total_amount),
+                            total: Number(o.total_amount || 0),
                             channel: o.channel || "Counter",
                             status: o.status,
-                            paymentMethod: o.payment_method || "Cash",
-                            cancelReason: o.cancel_reason
+                            paymentMethod: (o as any).payment_method || "Cash",
+                            cancelReason: (o as any).cancel_reason
                         };
                     });
                     setTransactions(mappedOrders);
@@ -246,8 +263,8 @@ export default function ReportsPage() {
                     setTransactions([]);
                 }
 
-            } catch (e) {
-                console.error("Transactions Fetch Error:", e);
+            } catch (e: any) {
+                console.error("Transactions Fetch Exception:", e?.message || e);
                 setTransactions([]); // Clear on error to avoid showing misleading stale data
             } finally {
                 setIsTableLoading(false);

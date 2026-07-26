@@ -171,7 +171,7 @@ export function OrderProvider({ children }: { children: ReactNode }) {
 
         fetchOrders();
 
-        // Realtime Subscription
+        // Realtime Subscription for Orders
         const channel = supabase
             .channel('orders-changes')
             .on(
@@ -183,28 +183,58 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                     filter: `store_id=eq.${user.storeId}`
                 },
                 (payload) => {
+                    console.log("[Orders Realtime] Payload received:", payload.eventType, payload.new);
                     // Check for new orders
                     if (payload.eventType === 'INSERT') {
                         const newOrder = payload.new as any;
-                        // STRICT FILTER: Only alert for customer QR orders
-                        if (newOrder.channel !== 'QR') {
-                            return;
+                        // Flexible filter: match QR orders
+                        if (newOrder.channel && newOrder.channel.toUpperCase() === 'COUNTER') {
+                            // Don't alert for counter orders created by admin themselves
+                        } else {
+                            console.log("[Orders Realtime] 🔔 Incoming QR Order:", newOrder);
+                            setIncomingOrder(newOrder);
                         }
-                        setIncomingOrder(newOrder);
                     }
 
-                    // Simple strategy: re-fetch all for simplicity in MVP
-                    // We add a small delay to ensure order_items are fully inserted/committed
-                    // before fetching the order with its items.
                     setTimeout(() => {
                         fetchOrders();
                     }, 500);
                 }
             )
-            .subscribe();
+            .subscribe((status) => {
+                console.log("[Orders Realtime] Subscription status:", status);
+            });
+
+        // Backup Polling (every 10s) in case Realtime WebSockets are blocked/disabled
+        let lastSeenOrderId: string | null = null;
+        const pollInterval = setInterval(async () => {
+            if (!mounted) return;
+            try {
+                const { data: latest } = await supabase
+                    .from("orders")
+                    .select("id, customer_name, total_amount, channel, created_at, status")
+                    .eq("store_id", user.storeId)
+                    .order("created_at", { ascending: false })
+                    .limit(1);
+
+                if (latest && latest.length > 0) {
+                    const newest = latest[0];
+                    if (lastSeenOrderId && newest.id !== lastSeenOrderId) {
+                        if (newest.channel !== 'Counter' && newest.status === 'pending') {
+                            console.log("[Orders Polling] 🔔 New QR Order detected via polling:", newest);
+                            setIncomingOrder(newest);
+                        }
+                    }
+                    lastSeenOrderId = newest.id;
+                }
+            } catch (e) {
+                // Ignore polling errors
+            }
+        }, 10000);
 
         return () => {
             mounted = false;
+            clearInterval(pollInterval);
             supabase.removeChannel(channel);
         };
     }, [user?.storeId]);
@@ -393,20 +423,42 @@ export function OrderProvider({ children }: { children: ReactNode }) {
                 updatePayload.cancel_reason = reason;
             }
 
-            const { error } = await supabase
+            let { error } = await supabase
                 .from("orders")
                 .update(updatePayload)
                 .eq("id", orderId);
 
-            if (error) {
-                // Revert on error
-                // For MVP, we might just log or re-fetch. Ideally revert state.
-                console.error("Error updating status:", error);
-                // Revert to re-fetch
-                const { data: { user } } = await supabase.auth.getUser(); // dummy check
+            // Fallback 1: If update failed with cancel_reason (e.g. column missing), retry updating only status
+            if (error && updatePayload.cancel_reason) {
+                console.warn("Retrying status update without cancel_reason...", error.message);
+                const fallbackResult = await supabase
+                    .from("orders")
+                    .update({ status })
+                    .eq("id", orderId);
+                error = fallbackResult.error;
             }
-        } catch (error) {
-            console.error("Exception updating status:", error);
+
+            // Fallback 2: If update failed due to old DB check constraint, map status to legacy compatible status
+            if (error && error.message?.includes('orders_status_check')) {
+                let mappedStatus = status as string;
+                if (status === 'cooking') mappedStatus = 'preparing';
+                if (status === 'ready') mappedStatus = 'pending';
+
+                if (mappedStatus !== status) {
+                    console.warn(`[Order] Mapping status '${status}' to '${mappedStatus}' for legacy DB constraint`);
+                    const retryResult = await supabase
+                        .from("orders")
+                        .update({ status: mappedStatus })
+                        .eq("id", orderId);
+                    error = retryResult.error;
+                }
+            }
+
+            if (error) {
+                console.error("Error updating status:", error.message || JSON.stringify(error));
+            }
+        } catch (error: any) {
+            console.error("Exception updating status:", error?.message || error);
         }
     };
 

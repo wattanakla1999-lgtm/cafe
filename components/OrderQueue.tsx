@@ -6,6 +6,7 @@ import { useConfirm } from "../context/ConfirmContext";
 import { Button } from "./Button";
 import { OrderDetailsModal } from "./OrderDetailsModal";
 import { Order } from "../context/OrderContext";
+import { useRouter } from "next/navigation";
 
 interface OrderQueueProps {
     isOpen: boolean;
@@ -13,10 +14,16 @@ interface OrderQueueProps {
 }
 
 export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
+    const router = useRouter();
     const { orders, updateOrderStatus, completeOrder } = useOrder();
     const { confirm, prompt } = useConfirm();
     const [processingId, setProcessingId] = React.useState<string | null>(null);
     const [selectedOrder, setSelectedOrder] = React.useState<Order | null>(null);
+
+    const handleClose = () => {
+        onClose();
+        router.push("/");
+    };
 
     // Filter for active orders (pending, cooking, ready)
     const activeOrders = orders
@@ -28,21 +35,21 @@ export function OrderQueue({ isOpen, onClose }: OrderQueueProps) {
             className={`bg-white border-l border-[var(--color-coffee-200)] flex flex-col h-full shrink-0 shadow-xl z-30 transition-all duration-300 ease-in-out overflow-hidden ${isOpen ? "w-full lg:w-80 xl:w-96 opacity-100 translate-x-0" : "w-0 opacity-0 translate-x-10 border-none"
                 }`}
         >
-            <div className="p-4 border-b border-[var(--color-coffee-100)] bg-[var(--color-coffee-50)] shrink-0 flex justify-between items-center min-w-[300px] md:min-w-[320px]">
+            <div className="p-4 border-b border-[var(--color-coffee-100)] bg-[var(--color-coffee-50)] shrink-0 flex justify-between items-center w-full min-w-0">
                 <div className="flex items-center gap-3">
                     <h2 className="font-bold text-lg text-[var(--color-coffee-900)]">คิวปัจจุบัน</h2>
                     <span className="bg-[var(--color-primary)] text-white text-xs font-bold px-2 py-1 rounded-full">
                         {activeOrders.length}
                     </span>
                 </div>
-                <button onClick={onClose} className="text-[var(--color-coffee-400)] hover:text-[var(--color-coffee-700)]">
+                <button onClick={handleClose} className="text-[var(--color-coffee-400)] hover:text-[var(--color-coffee-700)] p-1 rounded-lg hover:bg-gray-100 transition-colors" title="ไปหน้าหลัก">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
                         <path fillRule="evenodd" d="M4.293 4.293a1 1 0 011.414 0L10 8.586l4.293-4.293a1 1 0 111.414 1.414L11.414 10l4.293 4.293a1 1 0 01-1.414 1.414L10 11.414l-4.293 4.293a1 1 0 01-1.414-1.414L8.586 10 4.293 5.707a1 1 0 010-1.414z" clipRule="evenodd" />
                     </svg>
                 </button>
             </div>
 
-            <div className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-4 space-y-4 bg-[var(--color-background)] min-w-[320px]">
+            <div className="flex-1 overflow-y-auto p-4 pb-24 lg:pb-4 space-y-4 bg-[var(--color-background)] w-full min-w-0">
                 {activeOrders.length === 0 ? (
                     <div className="h-full flex flex-col items-center justify-center text-[var(--color-coffee-400)] space-y-2 opacity-60">
                         <svg xmlns="http://www.w3.org/2000/svg" className="h-12 w-12" fill="none" viewBox="0 0 24 24" stroke="currentColor">

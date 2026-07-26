@@ -152,7 +152,7 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
 
             const { error: uploadError } = await supabase.storage
                 .from('menu-images')
-                .upload(finalFileName, compressedFile);
+                .upload(finalFileName, compressedFile, { upsert: true });
 
             if (uploadError) {
                 console.error('Upload Error:', uploadError);
@@ -164,9 +164,14 @@ export function MenuFormModal({ isOpen, onClose, initialData, onSubmit }: MenuFo
                 .getPublicUrl(finalFileName);
 
             return data.publicUrl;
-        } catch (error) {
+        } catch (error: any) {
             console.error('Error uploading image:', error);
-            alert("Failed to upload image. Please try again.");
+            const errorMsg = error?.message || '';
+            if (errorMsg.toLowerCase().includes('bucket not found') || error?.statusCode === 400 || error?.status === 400) {
+                alert("ไม่พบ Bucket 'menu-images' ใน Supabase Storage\n\nกรุณาสร้าง Bucket ชื่อ 'menu-images' (ตั้งเป็น Public) ใน Supabase Dashboard หรือรันคำสั่ง SQL ที่เตรียมไว้ให้ครับ");
+            } else {
+                alert(`อัปโหลดรูปไม่สำเร็จ: ${errorMsg || 'กรุณาลองใหม่อีกครั้ง'}`);
+            }
             return null;
         }
     };
