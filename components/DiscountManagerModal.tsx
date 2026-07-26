@@ -30,7 +30,7 @@ export function DiscountManagerModal({ isOpen, onClose }: DiscountManagerModalPr
             setMode("list");
             setEditingDiscount(null);
             setError("");
-            refetchMenu({ page: 0 });
+            refetchMenu();
         }
     }, [isOpen, refetchMenu]);
 

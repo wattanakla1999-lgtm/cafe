@@ -26,7 +26,7 @@ export function ToppingManagerModal({ isOpen, onClose }: ToppingManagerModalProp
             setMode("list");
             setEditingTopping(null);
             setError("");
-            refetchMenu({ page: 0 });
+            refetchMenu();
         }
     }, [isOpen, refetchMenu]);
 

@@ -28,7 +28,7 @@ export function ServingTypeManagerModal({ isOpen, onClose }: ServingTypeManagerM
             setError("");
             setFormData({ name: "", price: 0 });
             setPriceInput("");
-            refetchMenu({ page: 0 });
+            refetchMenu();
         }
     }, [isOpen, refetchMenu]);
 
